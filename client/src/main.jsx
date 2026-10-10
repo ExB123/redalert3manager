@@ -28,6 +28,7 @@ function App() {
   const [sort, setSort] = useState('points');
   const [crudDialog, setCrudDialog] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
+  const [rankedBusy, setRankedBusy] = useState(false);
   const [tableSort, setTableSort] = useState({ column: null, direction: 'asc' });
 
   const ratingTabs = ['Рейтинг Команд','Рейтинг Игроков','Рейтинг Альянс','Рейтинг Союз','Рейтинг Империя'];
@@ -73,6 +74,34 @@ function App() {
       setError('Не удалось загрузить данные: ' + (e?.message || 'неизвестная ошибка') + '. Проверьте доступность API и консоль сервера.');
       setData([]);
     } finally { setLoading(false); }
+  }
+
+  async function runRankedAction(action) {
+    if (rankedBusy) return;
+    if (action === 'simulate-20' && !window.confirm('Провести 20 новых рейтинговых матчей? Будут выбраны игроки, определены победители и обновлены RP/MMR/статистика.')) return;
+    if (action === 'simulate-upcoming' && !window.confirm('Симулировать до 20 ближайших незавершённых рейтинговых матчей? Результаты и рейтинги игроков будут сохранены.')) return;
+    setRankedBusy(true);
+    setError('');
+    setActionMessage('');
+    try {
+      const response = await fetch('/api/rating-matches/' + action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Не удалось выполнить действие.');
+      if (action === 'find-opponent') {
+        setActionMessage(result.message + ' ' + result.match.player1 + ' vs ' + result.match.player2 + (result.match.map ? ' · Карта: ' + result.match.map : '') + '.');
+      } else {
+        setActionMessage((result.message || 'Операция завершена.') + ' Обработано матчей: ' + result.count + '.');
+      }
+      await load();
+    } catch (e) {
+      setError(e?.message || 'Не удалось выполнить действие с рейтинговыми матчами.');
+    } finally {
+      setRankedBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -156,7 +185,12 @@ function App() {
                 {page !== 'bets' && !(page==='league' && ['Кабинет игрока','Статистика фракций'].includes(subtab)) && <Toolbar search={search} setSearch={setSearch} sort={sort} setSort={setSort} showSort={page==='teams'}/>}
               </div>
             </div>
-            {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
+            {page === 'league' && subtab === 'Рейтинговые матчи' && <div className="ranked-actions">
+              <button className="primary" disabled={rankedBusy} onClick={() => runRankedAction('find-opponent')}><Search size={16}/>{rankedBusy ? 'Обработка…' : 'Найти соперника'}</button>
+              <button className="ranked-secondary" disabled={rankedBusy} onClick={() => runRankedAction('simulate-20')}><Swords size={16}/>{rankedBusy ? 'Обработка…' : 'Провести 20 матчей'}</button>
+              <button className="ranked-secondary" disabled={rankedBusy} onClick={() => runRankedAction('simulate-upcoming')}><RefreshCw size={16}/>{rankedBusy ? 'Обработка…' : 'Симулировать ближайшие матчи'}</button>
+            </div>}
+            {error && <div className="error"><CircleAlert size={18}/>{error}</div>
             {actionMessage && <div className="success-message">{actionMessage}</div>}
             {page === 'simulator' && (
               <SimulatorPanel onComplete={async winner => {

@@ -174,7 +174,7 @@ function App() {
           <div className="home-grid">{homeCards.map(([name,desc,id,Icon])=><article className="home-card" key={id}><h2><Icon size={22}/>{name}</h2><p>{desc}</p><button className="primary" onClick={() => goPage(id)}>Перейти</button></article>)}</div>
         </> : <>
           <h1 className="page-title">{title}</h1>
-          {page === 'rating' && <div className="tabs">{ratingTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
+          {page === 'rating' && <div className="tabs rating-tabs">{ratingTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'league' && <div className="tabs">{leagueTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'maps' && <div className="tabs"><button className={subtab==='Карты'?'selected':''} onClick={()=>setSubtab('Карты')}>Карты</button><button className={subtab==='Статистика карт'?'selected':''} onClick={()=>setSubtab('Статистика карт')}>Статистика карт</button></div>}
           {page === 'info' && <div className="tabs">{['Информация','Достижения','Медали','Посты победителей','Витрина достижений'].map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
@@ -208,6 +208,7 @@ function App() {
               <DataTable
                 rows={visibleData}
                 columns={columns}
+                podium={page === 'rating'}
                 empty={emptyMessage(page,subtab)}
                 onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null}
                 onDelete={crudEntity ? deleteRow : null}
@@ -656,7 +657,7 @@ function emptyMessage(page, subtab) {
 function Toolbar({search,setSearch,sort,setSort,showSort=false}) {
   return <div className="toolbar"><div className="search"><Search size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск…"/></div>{showSort&&<select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Сортировка"><option value="points">Сортировка: по очкам</option><option value="wins">Сортировка: по победам</option><option value="level">Сортировка: по уровню</option></select>}</div>;
 }
-function DataTable({rows,columns,empty,onEdit,onDelete,canEdit,canDelete,onComplete,canComplete,sortColumn,sortDirection,onSort}) {
+function DataTable({rows,columns,empty,onEdit,onDelete,canEdit,canDelete,onComplete,canComplete,sortColumn,sortDirection,onSort,podium=false}) {
   const sortedRows = useMemo(() => {
     if (sortColumn == null || !columns?.[sortColumn]) return rows || [];
     const column = columns[sortColumn];
@@ -667,7 +668,7 @@ function DataTable({rows,columns,empty,onEdit,onDelete,canEdit,canDelete,onCompl
   }, [rows,columns,sortColumn,sortDirection]);
   if (!columns?.length) return <div className="empty-state">Этот экран пока не подключён.</div>;
   if (!sortedRows.length) return <div className="empty-state">{empty}</div>;
-  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}><button type="button" className="sortable-header" onClick={()=>onSort?.(i)} title={'Сортировать: '+label}>{label}<span aria-hidden="true">{sortColumn===i?(sortDirection==='asc'?' ↑':' ↓'):' ↕'}</span></button></th>)}{(onEdit || onDelete || onComplete) && <th>Действия</th>}</tr></thead><tbody>{sortedRows.map((r,i)=><tr key={r.id||i}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}{(onEdit || onDelete || onComplete) && <td><div className="row-actions">{onEdit && (!canEdit || canEdit(r)) && <button className="icon-btn" title="Редактировать" onClick={() => onEdit(r)}><Pencil size={15}/></button>}{onDelete && (!canDelete || canDelete(r)) && <button className="icon-btn danger-btn" title="Удалить" onClick={() => onDelete(r)}><Trash2 size={15}/></button>}{onComplete && !r.completed && <button className="icon-btn complete-btn" title={canComplete && !canComplete(r)?'Сначала укажите две команды и неравный счёт':'Завершить матч'} disabled={Boolean(canComplete && !canComplete(r))} onClick={() => onComplete(r)}><CheckCircle2 size={15}/></button>}{onEdit && canEdit && !canEdit(r) && <span className="locked-row">Зафиксирован</span>}</div></td>}</tr>)}</tbody></table></div>;
+  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}><button type="button" className="sortable-header" onClick={()=>onSort?.(i)} title={'Сортировать: '+label}>{label}<span aria-hidden="true">{sortColumn===i?(sortDirection==='asc'?' ↑':' ↓'):' ↕'}</span></button></th>)}{(onEdit || onDelete || onComplete) && <th>Действия</th>}</tr></thead><tbody>{sortedRows.map((r,i)=><tr key={r.id||i} className={podium && i<3 ? 'podium p'+i : undefined}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}{(onEdit || onDelete || onComplete) && <td><div className="row-actions">{onEdit && (!canEdit || canEdit(r)) && <button className="icon-btn" title="Редактировать" onClick={() => onEdit(r)}><Pencil size={15}/></button>}{onDelete && (!canDelete || canDelete(r)) && <button className="icon-btn danger-btn" title="Удалить" onClick={() => onDelete(r)}><Trash2 size={15}/></button>}{onComplete && !r.completed && <button className="icon-btn complete-btn" title={canComplete && !canComplete(r)?'Сначала укажите две команды и неравный счёт':'Завершить матч'} disabled={Boolean(canComplete && !canComplete(r))} onClick={() => onComplete(r)}><CheckCircle2 size={15}/></button>}{onEdit && canEdit && !canEdit(r) && <span className="locked-row">Зафиксирован</span>}</div></td>}</tr>)}</tbody></table></div>;
 }
 function columnsFor(page, subtab) {
   const map = {

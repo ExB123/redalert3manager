@@ -235,13 +235,42 @@ function simulateRankedMatch(match, playersById, rules, nowIso, forcedWinnerId =
   }
   return { matchId:match.id, player1:first.nickname, player2:second.nickname, winner:winner.nickname, map:match.map || null };
 }
+app.get('/api/settings/main-player', (_req,res) => {
+  try {
+    const configured = db.prepare("SELECT value FROM GameConfig WHERE key='main_player_id'").get()?.value;
+    let player = configured ? db.prepare('SELECT id,nickname FROM Player WHERE id=?').get(configured) : null;
+    if (!player) player = db.prepare('SELECT id,nickname FROM Player WHERE nickname=? COLLATE NOCASE').get('GGanz');
+    res.json({player:player || null,players:db.prepare('SELECT id,nickname FROM Player ORDER BY nickname COLLATE NOCASE').all()});
+  } catch(error) { res.status(500).json({error:error.message}); }
+});
+app.put('/api/settings/main-player', (req,res) => {
+  try {
+    const playerId = req.body?.playerId;
+    const player = db.prepare('SELECT id,nickname FROM Player WHERE id=?').get(playerId);
+    if (!player) return res.status(400).json({error:'Выберите существующего игрока.'});
+    const now = new Date().toISOString();
+    const current = db.prepare("SELECT id FROM GameConfig WHERE key='main_player_id'").get();
+    if (current) db.prepare("UPDATE GameConfig SET value=?,description=?,updatedAt=? WHERE key='main_player_id'").run(player.id,'Основной игрок для поиска рейтингового соперника',now);
+    else db.prepare("INSERT INTO GameConfig (id,key,value,description,createdAt,updatedAt) VALUES (?,?,?,?,?,?)").run(crypto.randomUUID().replace(/-/g,''),'main_player_id',player.id,'Основной игрок для поиска рейтингового соперника',now,now);
+    res.json({ok:true,player});
+  } catch(error) { res.status(400).json({error:error.message || 'Не удалось сохранить игрока.'}); }
+});
+
 app.post('/api/rating-matches/find-opponent', (_req,res) => {
   try {
     const result = db.transaction(() => {
       const players = allRankedPlayers();
+      const configured = db.prepare("SELECT value FROM GameConfig WHERE key='main_player_id'").get()?.value;
+      const mainPlayer = (configured && players.find(p=>p.id===configured)) || players.find(p=>p.nickname.toLowerCase()==='gganz');
+      if (!mainPlayer) throw new Error('Игрок GGanz не найден. Добавьте его в список игроков или выберите основного игрока в настройках.');
       const busy = new Set(db.prepare('SELECT player1Id AS id FROM RatingMatch WHERE completed=0 UNION SELECT player2Id AS id FROM RatingMatch WHERE completed=0').all().map(row=>row.id));
-      const pair = chooseRankedPair(players,new Set(),busy);
-      if (!pair) throw new Error('Не удалось подобрать пару: нужны минимум два свободных игрока без незавершённых рейтинговых матчей.');
+      if (busy.has(mainPlayer.id)) throw new Error('У основного игрока уже есть незавершённый рейтинговый матч.');
+      const candidates = players.filter(p=>p.id!==mainPlayer.id && !busy.has(p.id));
+      if (!candidates.length) throw new Error('Нет свободных соперников для основного игрока.');
+      candidates.sort((a,b)=>Math.abs(Number(a.ratingPoints||0)-Number(mainPlayer.ratingPoints||0))-Math.abs(Number(b.ratingPoints||0)-Number(mainPlayer.ratingPoints||0)) || Number(a.ratingGames||0)-Number(b.ratingGames||0));
+      const shortlist = candidates.slice(0,Math.min(5,candidates.length));
+      const opponent = shortlist[Math.floor(Math.random()*shortlist.length)];
+      const pair = {first:mainPlayer,second:opponent};
       const maps = rankedMaps();
       const map = maps.length ? maps[Math.floor(Math.random()*maps.length)] : null;
       const now = new Date();

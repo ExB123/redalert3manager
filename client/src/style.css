@@ -155,3 +155,24 @@ tbody tr:hover{background:#0a1425}
 .map-stat-place{display:grid;place-items:center;width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,.06);color:var(--muted,#9299a5);font-weight:700}
 .map-stat-row strong{overflow-wrap:anywhere}.map-stat-row>span:last-child{color:var(--muted,#9299a5);white-space:nowrap}
 @media(max-width:900px){.map-stat-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.map-stats-columns{grid-template-columns:1fr}}
+
+
+/* Faction performance dashboard */
+.faction-dashboard{display:flex;flex-direction:column;gap:18px}
+.faction-comparison{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.faction-card{padding:18px;border:1px solid var(--border,#2a303a);border-radius:12px;background:rgba(255,255,255,.02);min-width:0}
+.faction-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.faction-card-head>div{display:flex;align-items:center;gap:10px;min-width:0}
+.faction-card-head h3{margin:0;font-size:16px}
+.faction-index{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:rgba(220,45,55,.13);color:#ff777d;font-size:11px;font-weight:800}
+.faction-card-head>strong{font-size:21px;white-space:nowrap}.faction-card-head>strong small{font-size:10px;color:var(--muted,#9299a5);font-weight:500}
+.faction-meter{height:6px;border-radius:10px;background:rgba(255,255,255,.08);overflow:hidden;margin-bottom:16px}
+.faction-meter span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#9e242d,#f35b61)}
+.faction-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.faction-metrics>div{display:flex;flex-direction:column;gap:5px;padding:10px;border-radius:8px;background:rgba(255,255,255,.025)}
+.faction-metrics span{font-size:10px;color:var(--muted,#9299a5)}.faction-metrics strong{font-size:16px}
+.faction-card h4{margin:18px 0 8px;font-size:12px}
+.faction-player{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid rgba(255,255,255,.07);font-size:12px}
+.faction-player>span{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.06);color:var(--muted,#9299a5)}
+.faction-player strong{flex:1;min-width:0;overflow-wrap:anywhere}.faction-player small{color:var(--muted,#9299a5);white-space:nowrap}
+@media(max-width:1100px){.faction-comparison{grid-template-columns:1fr}}

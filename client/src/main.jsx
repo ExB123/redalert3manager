@@ -25,7 +25,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('rpPoints');
+  const [sort, setSort] = useState('points');
   const [crudDialog, setCrudDialog] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
   const [tableSort, setTableSort] = useState({ column: null, direction: 'asc' });
@@ -170,7 +170,14 @@ function App() {
   </div>;
 
   async function deleteRow(row) {
-    if (!window.confirm('Удалить запись «' + (row.name || row.nickname || row.title || row.key || row.id) + '»? Это действие нельзя отменить.')) return;
+    const label = row.name || row.nickname || row.title || row.key || row.id;
+    const cascadeWarning = {
+      teams: ' ВНИМАНИЕ: удаление команды также удалит связанных игроков.',
+      tournaments: ' ВНИМАНИЕ: удаление турнира может удалить связанные матчи и посты победителей.',
+      players: ' ВНИМАНИЕ: удаление игрока также удалит связанные рейтинговые матчи и записи статистики карт.',
+      maps: ' ВНИМАНИЕ: удаление карты также удалит связанные записи статистики карт.'
+    }[crudEntity] || '';
+    if (!window.confirm('Удалить запись «' + label + '»? Это действие нельзя отменить.' + cascadeWarning)) return;
     try {
       const response = await fetch('/api/manage/' + crudEntity + '/' + encodeURIComponent(row.id), { method: 'DELETE' });
       const result = await response.json();

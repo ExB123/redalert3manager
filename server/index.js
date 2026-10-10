@@ -38,6 +38,77 @@ app.get('/api/tournaments', (_req, res) => {
 app.get('/api/matches', (_req, res) => {
   res.json(db.prepare(`SELECT m.id,m.tournamentId,m.homeTeamId,m.awayTeamId,m.homeScore,m.awayScore,m.winnerId,m.nextMatchId,m.round,m.map,m.completed,m.createdAt,t.name AS tournamentName,h.name AS homeTeam,a.name AS awayTeam,w.name AS winnerName,COALESCE(h.name,'?') || ' — ' || COALESCE(a.name,'?') || ' · ' || COALESCE(m.map,'карта не указана') AS matchLabel FROM Match m LEFT JOIN Tournament t ON t.id=m.tournamentId LEFT JOIN Team h ON h.id=m.homeTeamId LEFT JOIN Team a ON a.id=m.awayTeamId LEFT JOIN Team w ON w.id=m.winnerId ORDER BY m.createdAt DESC LIMIT 500`).all());
 });
+app.post('/api/matches/:id/complete', (req, res) => {
+  try {
+    const match = db.prepare('SELECT id,tournamentId,homeTeamId,awayTeamId,homeScore,awayScore,winnerId,completed,map,nextMatchId FROM Match WHERE id=?').get(req.params.id);
+    if (!match) return res.status(404).json({ error: 'Матч не найден.' });
+    if (match.completed) return res.status(409).json({ error: 'Этот матч уже завершён; повторное начисление статистики запрещено.' });
+    if (!match.homeTeamId || !match.awayTeamId || match.homeTeamId === match.awayTeamId) return res.status(400).json({ error: 'Укажите две разные команды.' });
+    if (match.homeScore === null || match.homeScore === undefined || match.awayScore === null || match.awayScore === undefined) return res.status(400).json({ error: 'Перед завершением укажите счёт обеих команд.' });
+    if (Number(match.homeScore) === Number(match.awayScore)) return res.status(400).json({ error: 'Ничья не поддерживается: для завершения выберите счёт с победителем.' });
+    const home = db.prepare('SELECT id,name FROM Team WHERE id=?').get(match.homeTeamId);
+    const away = db.prepare('SELECT id,name FROM Team WHERE id=?').get(match.awayTeamId);
+    if (!home || !away) return res.status(400).json({ error: 'Одна из команд не найдена.' });
+    const configRow = db.prepare("SELECT value FROM GameConfig WHERE key='match_win'").get();
+    let rules;
+    try { rules = JSON.parse(configRow?.value || '{}'); } catch { return res.status(500).json({ error: 'Правило match_win в GameConfig содержит некорректный JSON.' }); }
+    const teamPoints = Number(rules.teamPoints ?? 0);
+    const playerPoints = Number(rules.playerPoints ?? 0);
+    const playerMMR = Number(rules.playerMMR ?? 0);
+    const playerMMRLoss = Number(rules.playerMMR_Loss ?? 0);
+    if (![teamPoints,playerPoints,playerMMR,playerMMRLoss].every(Number.isFinite)) return res.status(500).json({ error: 'Правило match_win содержит некорректные числовые значения.' });
+    const homeWon = Number(match.homeScore) > Number(match.awayScore);
+    const winner = homeWon ? home : away;
+    const loser = homeWon ? away : home;
+    const now = new Date().toISOString();
+    const result = db.transaction(() => {
+      db.prepare('UPDATE Match SET completed=1,winnerId=?,updatedAt=? WHERE id=? AND completed=0').run(winner.id,now,match.id);
+      db.prepare('UPDATE Team SET wins=wins+1,points=points+?,updatedAt=? WHERE id=?').run(teamPoints,now,winner.id);
+      db.prepare('UPDATE Team SET losses=losses+1,updatedAt=? WHERE id=?').run(now,loser.id);
+      const winningPlayers = db.prepare('SELECT id,rpPoints FROM Player WHERE teamId=?').all(winner.id);
+      const losingPlayers = db.prepare('SELECT id FROM Player WHERE teamId=?').all(loser.id);
+      const updateWinner = db.prepare('UPDATE Player SET matchWins=matchWins+1,ratingPoints=MAX(0,ratingPoints+?),rpPoints=rpPoints+?,rpPeak=MAX(rpPeak,rpPoints+?) WHERE id=?');
+      const updateLoser = db.prepare('UPDATE Player SET matchLosses=matchLosses+1,ratingPoints=MAX(0,ratingPoints+?) WHERE id=?');
+      for (const player of winningPlayers) updateWinner.run(playerMMR,playerPoints,playerPoints,player.id);
+      for (const player of losingPlayers) updateLoser.run(playerMMRLoss,player.id);
+      let mapId = null;
+      if (match.map) mapId = db.prepare('SELECT id FROM Map WHERE name=? COLLATE NOCASE').get(match.map)?.id || null;
+      const updateMapWin = db.prepare('UPDATE MapStat SET wins=wins+1 WHERE id=?');
+      const updateMapLoss = db.prepare('UPDATE MapStat SET losses=losses+1 WHERE id=?');
+      const insertMapStat = db.prepare('INSERT INTO MapStat (id,mapName,mapId,wins,losses,teamId,playerId,createdAt) VALUES (?,?,?,?,?,?,?,?)');
+      const updateStats = (players, won) => {
+        if (!match.map) return;
+        for (const player of players) {
+          const stat = mapId
+            ? db.prepare('SELECT id FROM MapStat WHERE mapId=? AND playerId=?').get(mapId,player.id)
+            : db.prepare('SELECT id FROM MapStat WHERE mapId IS NULL AND mapName=? AND playerId=?').get(match.map,player.id);
+          if (stat) (won ? updateMapWin : updateMapLoss).run(stat.id);
+          else insertMapStat.run(crypto.randomUUID().replace(/-/g,''),match.map,mapId,won?1:0,won?0:1,null,player.id,now);
+        }
+      };
+      updateStats(winningPlayers,true);
+      updateStats(losingPlayers,false);
+      let advanced = false;
+      if (match.nextMatchId) {
+        const next = db.prepare('SELECT id,homeTeamId,awayTeamId,completed FROM Match WHERE id=?').get(match.nextMatchId);
+        if (next && !next.completed) {
+          if (!next.homeTeamId) {
+            db.prepare('UPDATE Match SET homeTeamId=?,updatedAt=? WHERE id=?').run(winner.id,now,next.id);
+            advanced = true;
+          } else if (!next.awayTeamId) {
+            db.prepare('UPDATE Match SET awayTeamId=?,updatedAt=? WHERE id=?').run(winner.id,now,next.id);
+            advanced = true;
+          }
+        }
+      }
+      return { winner:winner.name, loser:loser.name, nextMatchAdvanced:advanced, winningPlayers:winningPlayers.length, losingPlayers:losingPlayers.length };
+    })();
+    res.json({ ok:true, matchId:match.id, ...result });
+  } catch (error) {
+    res.status(400).json({ error: safeErrorMessage(error) });
+  }
+});
+
 app.get('/api/rating-matches', (_req, res) => {
   res.json(db.prepare(`SELECT rm.id,rm.player1Id,rm.player2Id,rm.scheduledAt,rm.completed,rm.winnerId,rm.createdAt,rm.map,p1.nickname AS player1,p2.nickname AS player2,pw.nickname AS winner FROM RatingMatch rm LEFT JOIN Player p1 ON p1.id=rm.player1Id LEFT JOIN Player p2 ON p2.id=rm.player2Id LEFT JOIN Player pw ON pw.id=rm.winnerId ORDER BY rm.scheduledAt DESC LIMIT 500`).all());
 });
@@ -137,7 +208,7 @@ const editableEntities = {
   teams: { table: 'Team', fields: ['name','logoUrl','wins','losses','points','level','bestMap','worstMap'], required: ['name'] },
   players: { table: 'Player', fields: ['nickname','faction','teamId','experience','wins','ratingPoints','ratingGames','ratingWins','ratingLosses','rpPoints','rpPeak','isTeamCaptain','position','bestMap','worstMap','rankId','matchWins','matchLosses'], required: ['nickname','faction','teamId'] },
   tournaments: { table: 'Tournament', fields: ['name','description','imageUrl','type','seasonId','seasonNumber','winnerId','winnerName'], required: ['name'] },
-  matches: { table: 'Match', fields: ['tournamentId','homeTeamId','awayTeamId','homeScore','awayScore','winnerId','round','map','completed','nextMatchId','simulationLog'], required: ['tournamentId'] },
+  matches: { table: 'Match', fields: ['tournamentId','homeTeamId','awayTeamId','homeScore','awayScore','round','map','nextMatchId','simulationLog'], required: ['tournamentId'] },
   'rating-matches': { table: 'RatingMatch', fields: ['player1Id','player2Id','scheduledAt','completed','winnerId','map'], required: ['player1Id','player2Id','scheduledAt'] },
   seasons: { table: 'Season', fields: ['name','startDate','endDate','isActive'], required: ['name'] },
   maps: { table: 'Map', fields: ['name','imageUrl','description','playersCount'], required: ['name'] },
@@ -212,6 +283,7 @@ app.put('/api/manage/:entity/:id', (req, res) => {
   try {
     const exists = db.prepare(`SELECT id FROM "${entity.table}" WHERE id = ?`).get(req.params.id);
     if (!exists) return res.status(404).json({ error: 'Запись не найдена.' });
+    if (entity.table === 'Match' && db.prepare('SELECT completed FROM Match WHERE id=?').get(req.params.id)?.completed) return res.status(409).json({ error: 'Завершённый матч зафиксирован. Для изменения результата нужен отдельный откат статистики.' });
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const fields = entity.fields.filter(field => body[field] !== undefined);
     if (!fields.length) return res.status(400).json({ error: 'Нет полей для обновления.' });
@@ -234,6 +306,7 @@ app.delete('/api/manage/:entity/:id', (req, res) => {
   const entity = getEntityConfig(req, res);
   if (!entity) return;
   try {
+    if (entity.table === 'Match' && db.prepare('SELECT completed FROM Match WHERE id=?').get(req.params.id)?.completed) return res.status(409).json({ error: 'Завершённый матч нельзя удалить, потому что его результат уже учтён в статистике.' });
     const result = db.prepare(`DELETE FROM "${entity.table}" WHERE id = ?`).run(req.params.id);
     if (!result.changes) return res.status(404).json({ error: 'Запись не найдена.' });
     res.json({ ok: true, deletedId: req.params.id });

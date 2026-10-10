@@ -685,7 +685,7 @@ function FactionStatsPanel({rows}) {
 function MapStatsPanel({rows}) {
   const [catalogMaps,setCatalogMaps] = useState([]);
   const [matchRows,setMatchRows] = useState([]);
-  const [players,setPlayers] = useState([]);
+  const [rosterPlayers,setRosterPlayers] = useState([]);
   useEffect(() => {
     let active=true;
     fetch('/api/maps').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить каталог карт.');if(active)setCatalogMaps(Array.isArray(body)?body:[]);})
@@ -694,8 +694,8 @@ function MapStatsPanel({rows}) {
   },[]);
   useEffect(() => {
     let active=true;
-    fetch('/api/players').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить игроков.');if(active)setPlayers(Array.isArray(body)?body:[]);})
-      .catch(()=>{if(active)setPlayers([]);});
+    fetch('/api/players').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить игроков.');if(active)setRosterPlayers(Array.isArray(body)?body:[]);})
+      .catch(()=>{if(active)setRosterPlayers([]);});
     return ()=>{active=false;};
   },[]);
   useEffect(() => {
@@ -723,7 +723,7 @@ function MapStatsPanel({rows}) {
   },new Map());
   const bestWins=[...players.values()].sort((a,b)=>b.wins-a.wins || a.losses-b.losses).slice(0,5);
   const mostLosses=[...players.values()].sort((a,b)=>b.losses-a.losses || a.wins-b.wins).slice(0,5);
-  const playerFaction = new Map(players.map(player=>[player.id,player.faction]));
+  const playerFaction = new Map(rosterPlayers.map(player=>[player.id,player.faction]));
   const factionStats = selectedRows.reduce((acc,row)=>{
     const faction=playerFaction.get(row.playerId);
     if(!faction)return acc;

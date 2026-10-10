@@ -165,7 +165,7 @@ function App() {
               }} />
             )}
             {page === 'league' && subtab === 'Кабинет игрока' ? (
-              loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={visibleData} />
+              loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={data} />
             ) : specialPlaceholder ? (
               <div className="empty-state">{specialPlaceholder}</div>
             ) : loading ? (

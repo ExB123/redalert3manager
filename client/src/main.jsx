@@ -582,7 +582,14 @@ function FactionStatsPanel({rows}) {
 }
 
 function MapStatsPanel({rows}) {
-  const mapNames = [...new Set(rows.map(row => row.map || row.mapName).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+  const [catalogMaps,setCatalogMaps] = useState([]);
+  useEffect(() => {
+    let active=true;
+    fetch('/api/maps').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить каталог карт.');if(active)setCatalogMaps(Array.isArray(body)?body:[]);})
+      .catch(()=>{if(active)setCatalogMaps([]);});
+    return ()=>{active=false;};
+  },[]);
+  const mapNames = [...new Set([...catalogMaps.map(map=>map.name),...rows.map(row => row.map || row.mapName)].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
   const [selectedMap,setSelectedMap] = useState('');
   useEffect(() => {
     if (!mapNames.includes(selectedMap)) setSelectedMap(mapNames[0] || '');
@@ -602,7 +609,7 @@ function MapStatsPanel({rows}) {
   const bestWins=[...players.values()].sort((a,b)=>b.wins-a.wins || a.losses-b.losses).slice(0,5);
   const mostLosses=[...players.values()].sort((a,b)=>b.losses-a.losses || a.wins-b.wins).slice(0,5);
   const rate=totals.wins+totals.losses ? Math.round(totals.wins/(totals.wins+totals.losses)*100) : 0;
-  if(!rows.length) return <div className="empty-state">Статистика карт пока отсутствует. Она появится после фиксации результатов матчей с указанными картами.</div>;
+  if(!mapNames.length) return <div className="empty-state">Каталог карт пуст. Добавьте карты в разделе «Карты».</div>;
   return <div className="map-stats-dashboard">
     <div className="map-stats-toolbar"><label className="form-field"><span>Выберите карту</span><select value={selectedMap} onChange={e=>setSelectedMap(e.target.value)}>{mapNames.map(name=><option key={name} value={name}>{name}</option>)}</select></label></div>
     <div className="map-stat-cards">

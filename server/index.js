@@ -279,7 +279,21 @@ app.post('/api/rating-matches/find-opponent', (_req,res) => {
       const nowIso = now.toISOString();
       db.prepare('INSERT INTO RatingMatch (id,player1Id,player2Id,scheduledAt,completed,winnerId,createdAt,updatedAt,map) VALUES (?,?,?,?,0,NULL,?,?,?)')
         .run(id,pair.first.id,pair.second.id,scheduledAt,nowIso,nowIso,map);
-      return { ok:true, match:{id,player1Id:pair.first.id,player2Id:pair.second.id,player1:pair.first.nickname,player2:pair.second.nickname,scheduledAt,completed:0,map}, message:'Соперник найден. Матч добавлен в расписание.' };
+      const createdPairs = [];
+      const usedPairs = new Set([[pair.first.id,pair.second.id].sort().join(':')]);
+      const otherPlayers = players.filter(player => player.id !== mainPlayer.id && player.id !== opponent.id && !busy.has(player.id));
+      for (let index=0; index<20; index++) {
+        const nextPair = chooseRankedPair(otherPlayers,usedPairs);
+        if (!nextPair) break;
+        usedPairs.add(nextPair.key);
+        const pairTime = new Date(now.getTime()+(index+2)*10*60*1000).toISOString();
+        const pairId = crypto.randomUUID().replace(/-/g,'');
+        const pairMap = maps.length ? maps[Math.floor(Math.random()*maps.length)] : null;
+        db.prepare('INSERT INTO RatingMatch (id,player1Id,player2Id,scheduledAt,completed,winnerId,createdAt,updatedAt,map) VALUES (?,?,?,?,0,NULL,?,?,?)')
+          .run(pairId,nextPair.first.id,nextPair.second.id,pairTime,nowIso,nowIso,pairMap);
+        createdPairs.push({id:pairId,player1Id:nextPair.first.id,player2Id:nextPair.second.id,player1:nextPair.first.nickname,player2:nextPair.second.nickname,scheduledAt:pairTime,completed:0,map:pairMap});
+      }
+      return { ok:true, match:{id,player1Id:pair.first.id,player2Id:pair.second.id,player1:pair.first.nickname,player2:pair.second.nickname,scheduledAt,completed:0,map}, createdPairs, message:'Соперник найден. Матч добавлен в расписание; также создано пар других игроков: '+createdPairs.length+'.' };
     })();
     res.status(201).json(result);
   } catch(error) { res.status(400).json({error:error.message || 'Не удалось подобрать соперника.'}); }

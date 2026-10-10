@@ -811,9 +811,9 @@ function SettingsPanel() {
 
 function FactionName({value}) {
   const normalized = String(value || '').trim().toLowerCase();
-  const factionClass = normalized.includes('союз') ? 'faction-red'
-    : normalized.includes('альянс') ? 'faction-blue'
-    : normalized.includes('импер') ? 'faction-yellow' : 'faction-neutral';
+  const factionClass = normalized.includes('союз') || normalized.includes('soviet') ? 'faction-red'
+    : normalized.includes('альянс') || normalized.includes('allied') || normalized.includes('allies') ? 'faction-blue'
+    : normalized.includes('импер') || normalized.includes('empire') ? 'faction-yellow' : 'faction-neutral';
   return <span className={'faction-name '+factionClass}>{value || 'Не указана'}</span>;
 }
 

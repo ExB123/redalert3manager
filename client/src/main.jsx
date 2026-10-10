@@ -157,6 +157,7 @@ function App() {
             </div>
             {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
             {actionMessage && <div className="success-message">{actionMessage}</div>}
+            {page === 'simulator' && <SimulatorPanel onComplete={async winner => { setActionMessage('Симуляция завершена. Победитель: ' + winner); await load(); }} />}
             {specialPlaceholder ? <div className="empty-state">{specialPlaceholder}</div> : loading ? <p className="muted">Загрузка…</p> : <DataTable rows={visibleData} columns={columns} empty={emptyMessage(page,subtab)} onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null} onDelete={crudEntity ? deleteRow : null}/>}
           </section>
         </>}
@@ -354,6 +355,57 @@ function CrudDialog({entity,row,fields,onClose,onSaved}) {
   </div>;
 }
 
+function SimulatorPanel({onComplete}) {
+  const [teams,setTeams] = useState([]);
+  const [tournaments,setTournaments] = useState([]);
+  const [maps,setMaps] = useState([]);
+  const [team1Id,setTeam1Id] = useState('');
+  const [team2Id,setTeam2Id] = useState('');
+  const [tournamentId,setTournamentId] = useState('');
+  const [map,setMap] = useState('');
+  const [prob1,setProb1] = useState('50');
+  const [prob2,setProb2] = useState('50');
+  const [busy,setBusy] = useState(false);
+  const [error,setError] = useState('');
+  useEffect(() => {
+    Promise.all(['/api/teams','/api/tournaments','/api/maps'].map(url => fetch(url).then(r => {
+      if (!r.ok) throw new Error('Не удалось загрузить списки команд, турниров и карт.');
+      return r.json();
+    }))).then(([teamRows,tournamentRows,mapRows]) => {
+      setTeams(teamRows); setTournaments(tournamentRows); setMaps(mapRows);
+    }).catch(e => setError(e.message));
+  }, []);
+  async function run(event) {
+    event.preventDefault(); setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/simulations/run', {
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({team1Id,team2Id,tournamentId:tournamentId || null,map,prob1:Number(prob1),prob2:Number(prob2)})
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Не удалось провести симуляцию.');
+      await onComplete(result.result.winner);
+    } catch(e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+  return <div className="simulator-box">
+    <h3>Новая симуляция матча</h3>
+    <p className="muted">Выберите команды и вероятности победы. Результат будет сохранён в таблице Simulation.</p>
+    <form onSubmit={run}>
+      <div className="form-grid">
+        <label className="form-field"><span>Команда 1 *</span><select required value={team1Id} onChange={e=>setTeam1Id(e.target.value)}><option value="">— Выберите команду —</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <label className="form-field"><span>Команда 2 *</span><select required value={team2Id} onChange={e=>setTeam2Id(e.target.value)}><option value="">— Выберите команду —</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <label className="form-field"><span>Турнир (необязательно)</span><select value={tournamentId} onChange={e=>setTournamentId(e.target.value)}><option value="">— Без турнира —</option>{tournaments.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <label className="form-field"><span>Карта</span><select value={map} onChange={e=>setMap(e.target.value)}><option value="">— Не выбрана —</option>{maps.map(m=><option key={m.id} value={m.name}>{m.name}</option>)}</select></label>
+        <label className="form-field"><span>Вероятность победы команды 1 (%) *</span><input required type="number" min="0" max="100" value={prob1} onChange={e=>setProb1(e.target.value)}/></label>
+        <label className="form-field"><span>Вероятность победы команды 2 (%) *</span><input required type="number" min="0" max="100" value={prob2} onChange={e=>setProb2(e.target.value)}/></label>
+      </div>
+      {error && <div className="error"><CircleAlert size={16}/>{error}</div>}
+      <div className="modal-actions"><button className="primary" type="submit" disabled={busy || !teams.length}>{busy?'Симуляция…':'Провести симуляцию'}</button></div>
+    </form>
+  </div>;
+}
+
 function ImageCell({src,alt,type='team'}) {
   const [failed,setFailed] = useState(!src);
   useEffect(() => { setFailed(!src); }, [src]);
@@ -390,7 +442,7 @@ function columnsFor(page, subtab) {
     maps:subtab==='Статистика карт'?[['Карта',r=>r.map||r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']]:[['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="map"/>],['Карта','name'],['Игроков','playersCount'],['Описание','description']],
     config:[['Параметр','key'],['Значение','value'],['Описание','description']],
     ranks:[['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="rank"/>],['Звание','name'],['Описание','description'],['Победы для получения','requiredWins'],['Опыт для получения','requiredXP']],
-    simulator:[['Дата','createdAt'],['Входные данные','input'],['Результат','result']]
+    simulator:[['Дата','createdAt'],['Турнир',r=>{try{return JSON.parse(r.input).tournamentName || '—';}catch{return '—';}}],['Команды',r=>{try{const x=JSON.parse(r.input);return (x.team1 || '?')+' — '+(x.team2 || '?');}catch{return r.input;}}],['Карта',r=>{try{return JSON.parse(r.result).map || '—';}catch{return '—';}}],['Победитель',r=>{try{return JSON.parse(r.result).winner || '—';}catch{return r.result;}}]]
   };
   return map[page] || [];
 }

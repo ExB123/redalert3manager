@@ -28,6 +28,7 @@ function App() {
   const [sort, setSort] = useState('rpPoints');
   const [crudDialog, setCrudDialog] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
+  const [tableSort, setTableSort] = useState({ column: null, direction: 'asc' });
 
   const ratingTabs = ['Рейтинг Команд','Рейтинг Игроков','Рейтинг Альянс','Рейтинг Союз','Рейтинг Империя'];
   const leagueTabs = ['Информация о лигах','Рейтинговые матчи','Лучшие игроки','Кабинет игрока','Статистика фракций'];
@@ -78,6 +79,7 @@ function App() {
     fetch('/api/summary').then(r => r.json()).then(setSummary).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [page, subtab]);
+  useEffect(() => { setTableSort({ column: null, direction: 'asc' }); }, [page, subtab]);
 
   const visibleData = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -119,13 +121,12 @@ function App() {
   else if (page === 'info' && subtab === 'Достижения') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Достижение','name'],['Описание','description'],['Игрок','playerName'],['Команда','teamName'],['Тип условия','conditionType']];
   else if (page === 'info' && subtab === 'Медали') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Медаль','name'],['Описание','description'],['Создана','createdAt']];
   else if (page === 'info' && subtab === 'Посты победителей') columns = [['Турнир','tournamentName'],['Команда','teamName'],['Заголовок','title'],['Содержание','content'],['Создан','createdAt']];
-  else if (page === 'info' && subtab === 'Витрина достижений') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Название','name'],['Описание','description'],['Создана','createdAt']];
+  else if (page === 'info' && subtab === 'Информация') columns = [['Заголовок','title'],['Текст новости','content'],['Турнир','relatedTournamentName'],['Карта матча','relatedMatchMap'],['Дата','createdAt']];
+  else if (page === 'info' && subtab === 'Витрина достижений') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Название','name'],['Описание','description'],['Достижения','achievementNames'],['Создана','createdAt']];
 
   const specialPlaceholder = page === 'bets'
     ? 'В исходной SQL-базе нет таблицы ставок. Раздел нельзя корректно включить без согласования правил и структуры данных.'
-    : page === 'league' && subtab === 'Кабинет игрока'
-      ? 'Личный кабинет требует авторизации игроков. В этой версии авторизация ещё не реализована.'
-      : null;
+    : null;
   const crudEntity = entityFor(page, subtab);
   const crudFields = fieldsFor(page, subtab);
 
@@ -158,7 +159,8 @@ function App() {
             {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
             {actionMessage && <div className="success-message">{actionMessage}</div>}
             {page === 'simulator' && <SimulatorPanel onComplete={async winner => { setActionMessage('Симуляция завершена. Победитель: ' + winner); await load(); }} />}
-            {specialPlaceholder ? <div className="empty-state">{specialPlaceholder}</div> : loading ? <p className="muted">Загрузка…</p> : <DataTable rows={visibleData} columns={columns} empty={emptyMessage(page,subtab)} onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null} onDelete={crudEntity ? deleteRow : null}/>}
+            {page === 'league' && subtab === 'Кабинет игрока' ? (loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={visibleData}/>) : specialPlaceholder ? <div className="empty-state">{specialPlaceholder}</div> : loading ? <p className="muted">Загрузка…</p> : <DataTable rows={visibleData} columns={columns} empty={emptyMessage(page,subtab)} onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null} onDelete={crudEntity ? deleteRow : null} sortColumn={tableSort.column} sortDirection={tableSort.direction} onSort={column => setTableSort(current => ({ column, direction: current.column === column && current.direction === 'asc' ? 'desc' : 'asc' }))}/>}
+            {page === 'info' && subtab === 'Витрина достижений' && !loading && <ShowcaseLinksPanel showcases={data} onChanged={async () => { setActionMessage('Связи достижений обновлены.'); await load(); }}/ >
           </section>
         </>}
         <footer>Red Alert Tournament Manager <span>· независимая версия</span></footer>
@@ -264,7 +266,11 @@ function fieldsFor(page,subtab) {
       {name:'orderIndex',label:'Порядок отображения',type:'number',required:true}
     ],
     config: [{name:'key',label:'Ключ параметра',required:true},{name:'value',label:'Значение',required:true},{name:'description',label:'Описание',type:'textarea'}],
-    news: [{name:'title',label:'Заголовок',required:true},{name:'content',label:'Текст новости',type:'textarea',required:true}],
+    news: [
+      {name:'title',label:'Заголовок',required:true},{name:'content',label:'Текст новости',type:'textarea',required:true},
+      {name:'relatedTournamentId',label:'Связанный турнир',type:'remote',endpoint:'/api/tournaments',valueKey:'id',labelKey:'name'},
+      {name:'relatedMatchId',label:'Связанный матч',type:'remote',endpoint:'/api/matches',valueKey:'id',labelKey:'id'}
+    ],
     medals: [{name:'name',label:'Название медали',required:true},{name:'description',label:'Описание',type:'textarea'},{name:'imageUrl',label:'Ссылка на изображение'}],
     'winner-posts': [
       {name:'tournamentId',label:'Турнир',type:'remote',endpoint:'/api/tournaments',valueKey:'id',labelKey:'name',required:true},

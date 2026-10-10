@@ -180,7 +180,7 @@ function App() {
                 canEdit={row => !(crudEntity === 'matches' && row.completed)}
                 canDelete={row => !(crudEntity === 'matches' && row.completed)}
                 onComplete={page === 'matches' ? completeMatch : null}
-                canComplete={row => Boolean(!row.completed && row.homeTeamId && row.awayTeamId && row.homeScore !== null && row.homeScore !== undefined && row.awayScore !== null && row.awayScore !== undefined && Number(row.homeScore) !== Number(row.awayScore))}
+                canComplete={row => Boolean(!row.completed && row.homeTeamId && row.awayTeamId && row.homeTeamId !== row.awayTeamId && row.homeScore !== null && row.homeScore !== undefined && row.awayScore !== null && row.awayScore !== undefined && Number.isInteger(Number(row.homeScore)) && Number.isInteger(Number(row.awayScore)) && Number(row.homeScore) >= 0 && Number(row.awayScore) >= 0 && Number(row.homeScore) !== Number(row.awayScore))}
                 sortColumn={tableSort.column}
                 sortDirection={tableSort.direction}
                 onSort={column => setTableSort(current => ({
@@ -210,6 +210,7 @@ function App() {
     const ready = row.homeTeamId && row.awayTeamId && row.homeTeamId !== row.awayTeamId &&
       row.homeScore !== null && row.homeScore !== undefined &&
       row.awayScore !== null && row.awayScore !== undefined &&
+      Number.isInteger(Number(row.homeScore)) && Number.isInteger(Number(row.awayScore)) && Number(row.homeScore) >= 0 && Number(row.awayScore) >= 0 &&
       Number(row.homeScore) !== Number(row.awayScore) && !row.completed;
     if (!ready) {
       setActionMessage('Для завершения укажите две разные команды и счёт с победителем.');

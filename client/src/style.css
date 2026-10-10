@@ -260,3 +260,8 @@ tbody tr:hover{background:#0a1425}
 .faction-detail-table h3{margin:0 0 14px}
 .faction-detail-table .muted{line-height:1.6}
 @media(max-width:900px){.faction-overview-grid{grid-template-columns:1fr}}
+
+.cabinet-find-match{display:flex;align-items:center;gap:16px;margin:0 0 18px}
+.cabinet-find-match .muted{margin:0;line-height:1.5}
+.cabinet-find-match .primary{white-space:nowrap}
+@media(max-width:700px){.cabinet-find-match{align-items:flex-start;flex-direction:column}}

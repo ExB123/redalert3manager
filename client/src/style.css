@@ -176,3 +176,20 @@ tbody tr:hover{background:#0a1425}
 .faction-player>span{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.06);color:var(--muted,#9299a5)}
 .faction-player strong{flex:1;min-width:0;overflow-wrap:anywhere}.faction-player small{color:var(--muted,#9299a5);white-space:nowrap}
 @media(max-width:1100px){.faction-comparison{grid-template-columns:1fr}}
+
+
+/* Faction colors and explicit team-ranking podium */
+.faction-name{display:inline-flex;align-items:center;gap:7px;font-weight:750;letter-spacing:.01em;white-space:nowrap}
+.faction-name::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.faction-red{color:#ff454d!important}
+.faction-blue{color:#48a6ff!important}
+.faction-yellow{color:#ffd34e!important}
+.faction-neutral{color:#cbd5e1!important}
+.table-wrap tbody tr.podium.p0{background:linear-gradient(90deg,rgba(255,204,64,.18),rgba(255,204,64,.055))!important;box-shadow:inset 4px 0 #f4c542}
+.table-wrap tbody tr.podium.p1{background:linear-gradient(90deg,rgba(205,215,230,.16),rgba(205,215,230,.045))!important;box-shadow:inset 4px 0 #b9c5d6}
+.table-wrap tbody tr.podium.p2{background:linear-gradient(90deg,rgba(205,127,73,.17),rgba(205,127,73,.045))!important;box-shadow:inset 4px 0 #cd7f49}
+.table-wrap tbody tr.podium.p0 td:first-child{color:#ffd75a;font-weight:900}
+.table-wrap tbody tr.podium.p1 td:first-child{color:#d7e0ed;font-weight:900}
+.table-wrap tbody tr.podium.p2 td:first-child{color:#e5a070;font-weight:900}
+.table-wrap tbody tr.podium:hover{filter:brightness(1.12)}
+@media(max-width:760px){.faction-name{white-space:normal}}

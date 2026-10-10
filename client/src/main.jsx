@@ -190,7 +190,7 @@ function App() {
               <button className="ranked-secondary" disabled={rankedBusy} onClick={() => runRankedAction('simulate-20')}><Swords size={16}/>{rankedBusy ? 'Обработка…' : 'Провести 20 матчей'}</button>
               <button className="ranked-secondary" disabled={rankedBusy} onClick={() => runRankedAction('simulate-upcoming')}><RefreshCw size={16}/>{rankedBusy ? 'Обработка…' : 'Симулировать ближайшие матчи'}</button>
             </div>}
-            {error && <div className="error"><CircleAlert size={18}/>{error}</div>
+            {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
             {actionMessage && <div className="success-message">{actionMessage}</div>}
             {page === 'simulator' && (
               <SimulatorPanel onComplete={async winner => {

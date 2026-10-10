@@ -63,7 +63,7 @@ function App() {
       setData(rows);
       if (s.ok) setSummary(await s.json());
     } catch (e) {
-      setError('Не удалось загрузить данные. Проверьте, что сервер запущен командой npm run dev.');
+      setError('Не удалось загрузить данные: ' + (e?.message || 'неизвестная ошибка') + '. Проверьте доступность API и консоль сервера.');
       setData([]);
     } finally { setLoading(false); }
   }
@@ -99,18 +99,18 @@ function App() {
   if (page === 'rating') {
     sectionTitle = subtab;
     columns = subtab === 'Рейтинг Команд' ? [
-      ['Место',(_,i)=>i+1],['Команда',r=><span className="team-name">{r.logoUrl && <img src={r.logoUrl} onError={e=>e.currentTarget.style.display='none'} alt=""/>}{r.name}</span>],
+      ['Место',(_,i)=>i+1],['Команда',r=><span className="team-name"><ImageCell src={r.logoUrl} alt={r.name} type="team"/>{r.name}</span>],
       ['Сыграно игр',r=>(r.wins||0)+(r.losses||0)],['Очки',r=>r.points],['Победы',r=>r.wins],['Поражения',r=>r.losses],['Уровень',r=>r.level]
-    ] : [['Место',(_,i)=>i+1],['Игрок','nickname'],['Фракция','faction'],['Команда','teamName'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Победы','ratingWins'],['Поражения','ratingLosses'],['Звание','rankName']];
+    ] : [['Место',(_,i)=>i+1],['Игрок','nickname'],['Фракция','faction'],['Команда','teamName'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Победы','ratingWins'],['Поражения','ratingLosses'],['Звание',r=><span className="rank-cell"><ImageCell src={r.rankImageUrl} alt={r.rankName} type="rank"/>{fmt(r.rankName)}</span>]];
   } else if (page === 'league') {
     sectionTitle = subtab;
-    if (subtab === 'Информация о лигах') columns = [['#',(_,i)=>i+1],['Лига','name'],['Минимум очков','requiredPoints'],['Описание','description']];
+    if (subtab === 'Информация о лигах') columns = [['#',(_,i)=>i+1],['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="league"/>],['Лига','name'],['Минимум очков','requiredPoints'],['Описание','description']];
     else if (subtab === 'Рейтинговые матчи') columns = [['Игрок 1','player1'],['Игрок 2','player2'],['Дата','scheduledAt'],['Карта','map'],['Победитель','winner'],['Завершён',r=>bool(r.completed)]];
-    else if (subtab === 'Лучшие игроки') columns = [['Место',(_,i)=>i+1],['Игрок','nickname'],['Фракция','faction'],['Команда','teamName'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Победы','ratingWins'],['Поражения','ratingLosses']];
+    else if (subtab === 'Лучшие игроки') columns = [['Место',(_,i)=>i+1],['Игрок','nickname'],['Фракция','faction'],['Команда','teamName'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Победы','ratingWins'],['Поражения','ratingLosses'],['Звание',r=><span className="rank-cell"><ImageCell src={r.rankImageUrl} alt={r.rankName} type="rank"/>{fmt(r.rankName)}</span>];
     else columns = [];
   } else if (page === 'maps' && subtab === 'Статистика карт') columns = [['Карта',r=>r.map || r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']];
-  else if (page === 'info' && subtab === 'Достижения') columns = [['Достижение','name'],['Описание','description'],['Игрок','playerName'],['Команда','teamName'],['Тип условия','conditionType']];
-  else if (page === 'info' && subtab === 'Медали') columns = [['Медаль','name'],['Описание','description'],['Создана','createdAt']];
+  else if (page === 'info' && subtab === 'Достижения') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Достижение','name'],['Описание','description'],['Игрок','playerName'],['Команда','teamName'],['Тип условия','conditionType']];
+  else if (page === 'info' && subtab === 'Медали') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Медаль','name'],['Описание','description'],['Создана','createdAt']];
 
   const specialPlaceholder = page === 'bets'
     ? 'В исходной SQL-базе нет таблицы ставок. Раздел нельзя корректно включить без согласования правил и структуры данных.'
@@ -153,7 +153,7 @@ function App() {
   </div>;
 }
 
-function emptyMessage(page, subtab) {
+function ImageCell({src,alt,type='team'}) {\n  const [failed,setFailed] = useState(!src);\n  useEffect(() => { setFailed(!src); }, [src]);\n  const label = String(alt || '').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase() || (type==='rank'?'★':type==='league'?'L':'?');\n  return <span className={'image-cell image-'+type} title={alt || ''}>\n    {!failed && src ? <img src={src} alt={alt || ''} loading="lazy" onError={() => setFailed(true)}/> : <span className="image-fallback">{label}</span>}\n  </span>;\n}\n\nfunction emptyMessage(page, subtab) {
   if (page==='info' && subtab==='Информация') return 'Новостей пока нет — таблица News в исходной базе пустая.';
   if (page==='info' && subtab==='Медали') return 'Медалей пока нет — таблица Medal в исходной базе пустая.';
   if (page==='info' && subtab==='Достижения') return 'Достижения не найдены.';
@@ -170,14 +170,14 @@ function DataTable({rows,columns,empty}) {
 }
 function columnsFor(page, subtab) {
   const map = {
-    teams:[['Команда','name'],['Очки','points'],['Победы','wins'],['Поражения','losses'],['Уровень','level'],['Лучшая карта','bestMap'],['Худшая карта','worstMap']],
+    teams:[['Логотип',r=><ImageCell src={r.logoUrl} alt={r.name} type="team"/>],['Команда','name'],['Очки','points'],['Победы','wins'],['Поражения','losses'],['Уровень','level'],['Лучшая карта','bestMap'],['Худшая карта','worstMap']],
     players:[['Игрок','nickname'],['Фракция','faction'],['Команда','teamName'],['Опыт','experience'],['Победы','wins'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Звание','rankName']],
-    tournaments:[['Турнир','name'],['Тип','type'],['Сезон','seasonNumber'],['Победитель','winnerName'],['Создан','createdAt']],
+    tournaments:[['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="league"/>],['Турнир','name'],['Тип','type'],['Сезон','seasonNumber'],['Победитель','winnerName'],['Создан','createdAt']],
     matches:[['Турнир','tournamentName'],['Команда 1','homeTeam'],['Счёт',r=>fmt(r.homeScore)+' : '+fmt(r.awayScore)],['Команда 2','awayTeam'],['Карта','map'],['Раунд','round'],['Завершён',r=>bool(r.completed)]],
     seasons:[['Сезон','name'],['Начало','startDate'],['Конец','endDate'],['Активен',r=>bool(r.isActive)]],
-    maps:subtab==='Статистика карт'?[['Карта',r=>r.map||r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']]:[['Карта','name'],['Игроков','playersCount'],['Описание','description']],
+    maps:subtab==='Статистика карт'?[['Карта',r=>r.map||r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']]:[['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="map"/>],['Карта','name'],['Игроков','playersCount'],['Описание','description']],
     config:[['Параметр','key'],['Значение','value'],['Описание','description']],
-    ranks:[['Звание','name'],['Описание','description'],['Победы для получения','requiredWins'],['Опыт для получения','requiredXP']],
+    ranks:[['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="rank"/>],['Звание','name'],['Описание','description'],['Победы для получения','requiredWins'],['Опыт для получения','requiredXP']],
     simulator:[['Дата','createdAt'],['Входные данные','input'],['Результат','result']]
   };
   return map[page] || [];

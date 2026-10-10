@@ -654,11 +654,10 @@ function FactionStatsPanel({rows}) {
   }).sort((a,b)=>b.wins-a.wins);
   if(!rows.length) return <div className="empty-state">Статистика фракций пока отсутствует в базе.</div>;
   return <div className="faction-dashboard">
-    <div className="map-stat-cards">
-      <div className="map-stat-card"><span>Фракций с данными</span><strong>{rows.length}</strong></div>
-      <div className="map-stat-card"><span>Победы суммарно</span><strong>{totalWins}</strong></div>
-      <div className="map-stat-card"><span>Поражения суммарно</span><strong>{totalLosses}</strong></div>
-      <div className="map-stat-card"><span>Игроков</span><strong>{rows.reduce((sum,row)=>sum+Number(row.players||0),0)}</strong></div>
+    <div className="faction-overview-grid">
+      <div className="map-stat-card"><span>Всего матчей по статистике</span><strong>{totalWins}</strong></div>
+      <div className="map-stat-card"><span>Побед по фракциям</span><div className="faction-summary-lines">{factions.map(row=><div key={row.faction}><FactionName value={row.faction}/><strong>{row.wins||0}</strong></div>)}</div></div>
+      <div className="map-stat-card"><span>Поражений по фракциям</span><div className="faction-summary-lines">{factions.map(row=><div key={row.faction}><FactionName value={row.faction}/><strong>{row.losses||0}</strong></div>)}</div></div>
     </div>
     <div className="faction-comparison">{factions.map((faction,index)=>{
       const top=players.filter(player=>player.faction===faction.faction).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,3);
@@ -669,7 +668,17 @@ function FactionStatsPanel({rows}) {
         {top.length ? top.map((player,i)=><div className="faction-player" key={player.id}><span>{i+1}</span><strong>{player.nickname}</strong><small>{player.rpPoints??0} RP</small></div>) : <p className="muted">Игроки этой фракции не найдены.</p>}
       </section>;
     })}</div>
-    <p className="muted">Показатели рассчитаны по сохранённым итоговым значениям игроков. Прямое сравнение очных противостояний фракций не выводится, поскольку база не хранит фракции обоих участников в каждой исторической записи матча.</p>
+    <section className="faction-detail-table panel">
+      <h3>Лучшие игроки фракций</h3>
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Фракция</th><th>Игрок</th><th>Команда</th><th>RP</th><th>Звание</th></tr></thead><tbody>
+        {factions.map(faction=>players.filter(player=>String(player.faction||'').toLowerCase()===String(faction.faction||'').toLowerCase()).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,1).map(player=><tr key={faction.faction}><td><FactionName value={faction.faction}/></td><td>{player.nickname}</td><td>{player.teamName||'—'}</td><td>{player.rpPoints??0}</td><td>{player.rankName||'—'}</td></tr>))}
+      </tbody></table></div>
+    </section>
+    <section className="faction-detail-table panel">
+      <h3>Исход встреч фракций</h3>
+      <p className="muted">Нет достаточных исторических данных для достоверной таблицы: база не сохраняет фракции обоих участников на момент каждого матча. Таблица появится после добавления этой информации к новым матчам; исторические результаты не будут выдумываться.</p>
+    </section>
+    <p className="muted">Суммарные победы и поражения взяты из статистики игроков в базе. Сравнение фракций между собой пока не рассчитывается, чтобы не показывать недостоверные числа.</p>
   </div>;
 }
 

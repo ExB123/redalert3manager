@@ -35,6 +35,8 @@ function App() {
     setSearch('');
     if (id === 'rating') setSubtab('Рейтинг Команд');
     if (id === 'league') setSubtab('Информация о лигах');
+    if (id === 'maps') setSubtab('Карты');
+    if (id === 'info') setSubtab('Информация');
   }
 
   function endpointFor() {

@@ -210,14 +210,15 @@ function chooseRankedPair(players, usedPairs = new Set(), busyIds = new Set()) {
   const second = best[Math.floor(Math.random() * best.length)];
   return { first, second, key:[first.id,second.id].sort().join(':') };
 }
-function simulateRankedMatch(match, playersById, rules, nowIso) {
+function simulateRankedMatch(match, playersById, rules, nowIso, forcedWinnerId = null) {
   const first = playersById.get(match.player1Id) || db.prepare('SELECT id,nickname,ratingPoints,ratingGames,ratingWins,ratingLosses,rpPoints,rpPeak FROM Player WHERE id=?').get(match.player1Id);
   const second = playersById.get(match.player2Id) || db.prepare('SELECT id,nickname,ratingPoints,ratingGames,ratingWins,ratingLosses,rpPoints,rpPeak FROM Player WHERE id=?').get(match.player2Id);
   if (!first || !second || first.id === second.id) throw new Error('У рейтингового матча отсутствуют два разных игрока.');
   const p1 = Number(first.ratingPoints || 0);
   const p2 = Number(second.ratingPoints || 0);
   const chance1 = 1 / (1 + Math.pow(10, (p2-p1)/400));
-  const winner = Math.random() < chance1 ? first : second;
+  const winner = forcedWinnerId ? [first, second].find(player => player.id === forcedWinnerId) : (Math.random() < chance1 ? first : second);
+  if (!winner) throw new Error('Победитель должен быть одним из двух участников матча.');
   const loser = winner.id === first.id ? second : first;
   const winMMR = Math.max(0, Number(winner.ratingPoints || 0) + rules.playerMMR);
   const loseMMR = Math.max(0, Number(loser.ratingPoints || 0) + rules.playerMMRLoss);
@@ -254,6 +255,26 @@ app.post('/api/rating-matches/find-opponent', (_req,res) => {
     res.status(201).json(result);
   } catch(error) { res.status(400).json({error:error.message || 'Не удалось подобрать соперника.'}); }
 });
+app.post('/api/rating-matches/:id/complete', (req,res) => {
+  try {
+    const winnerId = req.body?.winnerId;
+    if (typeof winnerId !== 'string' || !winnerId) return res.status(400).json({error:'Укажите победителя матча.'});
+    const result = db.transaction(() => {
+      const match = db.prepare('SELECT id,player1Id,player2Id,scheduledAt,map,completed FROM RatingMatch WHERE id=?').get(req.params.id);
+      if (!match) throw new Error('Рейтинговый матч не найден.');
+      if (match.completed) throw new Error('Этот матч уже завершён; повторное начисление рейтинга запрещено.');
+      if (winnerId !== match.player1Id && winnerId !== match.player2Id) throw new Error('Победитель должен быть одним из участников матча.');
+      const rules = rankedRules();
+      const playersById = new Map(allRankedPlayers().map(player=>[player.id,player]));
+      const played = simulateRankedMatch(match,playersById,rules,new Date().toISOString(),winnerId);
+      db.prepare('INSERT INTO Simulation (id,createdAt,input,result) VALUES (?,?,?,?)')
+        .run(crypto.randomUUID().replace(/-/g,''),new Date().toISOString(),JSON.stringify({type:'rating-manual',matchId:match.id,winnerId}),JSON.stringify(played));
+      return {ok:true,...played};
+    })();
+    res.json(result);
+  } catch(error) { res.status(400).json({error:error.message || 'Не удалось завершить рейтинговый матч.'}); }
+});
+
 app.post('/api/rating-matches/simulate-20', (_req,res) => {
   try {
     const result = db.transaction(() => {

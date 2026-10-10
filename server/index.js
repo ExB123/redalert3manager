@@ -309,8 +309,13 @@ app.post('/api/rating-matches/simulate-20', (_req,res) => {
     const result = db.transaction(() => {
       const rules = rankedRules();
       const maps = rankedMaps();
-      const playersById = new Map(allRankedPlayers().map(player=>[player.id,player]));
-      if (playersById.size < 2) throw new Error('Для симуляции нужны минимум два игрока.');
+      const allPlayers = allRankedPlayers();
+      const configuredMainId = db.prepare("SELECT value FROM GameConfig WHERE key='main_player_id'").get()?.value;
+      const mainPlayer = (configuredMainId && allPlayers.find(player=>player.id===configuredMainId))
+        || allPlayers.find(player=>String(player.nickname||'').toLowerCase()==='gganz');
+      // Bulk run intentionally excludes the configured main player (GGanz by default).
+      const playersById = new Map(allPlayers.filter(player=>!mainPlayer || player.id!==mainPlayer.id).map(player=>[player.id,player]));
+      if (playersById.size < 2) throw new Error('Для симуляции нужны минимум два игрока помимо основного игрока.');
       const created = [];
       const usedPairs = new Set();
       for (let i=0;i<20;i++) {
@@ -328,7 +333,7 @@ app.post('/api/rating-matches/simulate-20', (_req,res) => {
         created.push(played);
       }
       db.prepare('INSERT INTO Simulation (id,createdAt,input,result) VALUES (?,?,?,?)')
-        .run(crypto.randomUUID().replace(/-/g,''),new Date().toISOString(),JSON.stringify({type:'rating-batch',count:20}),JSON.stringify({count:created.length,matches:created}));
+        .run(crypto.randomUUID().replace(/-/g,''),new Date().toISOString(),JSON.stringify({type:'rating-batch',count:20,excludedMainPlayer:mainPlayer?.nickname || null}),JSON.stringify({count:created.length,matches:created}));
       return {ok:true,count:created.length,matches:created};
     })();
     res.json(result);

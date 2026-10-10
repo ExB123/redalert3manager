@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Coins, Award, Info, Map, CalendarDays, ChartNoAxesColumn, Layers, FlaskConical, ContactRound, UsersRound, Swords, Trophy, Search, RefreshCw, House, ChevronRight, CircleAlert, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
+import { Coins, Award, Info, Map, CalendarDays, ChartNoAxesColumn, Layers, FlaskConical, ContactRound, UsersRound, Swords, Trophy, Search, RefreshCw, House, ChevronRight, CircleAlert, Plus, Pencil, Trash2, X, Save, CheckCircle2 } from 'lucide-react';
 import './style.css';
 
 const nav = [
@@ -177,6 +177,10 @@ function App() {
                 empty={emptyMessage(page,subtab)}
                 onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null}
                 onDelete={crudEntity ? deleteRow : null}
+                canEdit={row => !(crudEntity === 'matches' && row.completed)}
+                canDelete={row => !(crudEntity === 'matches' && row.completed)}
+                onComplete={page === 'matches' ? completeMatch : null}
+                canComplete={row => Boolean(!row.completed && row.homeTeamId && row.awayTeamId && row.homeScore !== null && row.homeScore !== undefined && row.awayScore !== null && row.awayScore !== undefined && Number(row.homeScore) !== Number(row.awayScore))}
                 sortColumn={tableSort.column}
                 sortDirection={tableSort.direction}
                 onSort={column => setTableSort(current => ({
@@ -201,6 +205,28 @@ function App() {
     </main>
     {crudDialog && <CrudDialog entity={crudDialog.entity} row={crudDialog.row} fields={crudDialog.fields} onClose={() => setCrudDialog(null)} onSaved={async message => { setCrudDialog(null); setActionMessage(message); await load(); }}/>}
   </div>;
+
+  async function completeMatch(row) {
+    const ready = row.homeTeamId && row.awayTeamId && row.homeTeamId !== row.awayTeamId &&
+      row.homeScore !== null && row.homeScore !== undefined &&
+      row.awayScore !== null && row.awayScore !== undefined &&
+      Number(row.homeScore) !== Number(row.awayScore) && !row.completed;
+    if (!ready) {
+      setActionMessage('Для завершения укажите две разные команды и счёт с победителем.');
+      return;
+    }
+    const winnerName = Number(row.homeScore) > Number(row.awayScore) ? row.homeTeam : row.awayTeam;
+    if (!window.confirm('Завершить матч и начислить статистику? Победитель: ' + winnerName + '. После фиксации результат нельзя будет изменить или удалить без отдельного отката статистики.')) return;
+    try {
+      const response = await fetch('/api/matches/' + encodeURIComponent(row.id) + '/complete', { method:'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));
+      setActionMessage('Матч завершён. Победитель: ' + result.winner + '.' + (result.nextMatchAdvanced ? ' Победитель добавлен в следующий матч сетки.' : ''));
+      await load();
+    } catch (e) {
+      setActionMessage('Не удалось завершить матч: ' + e.message);
+    }
+  }
 
   async function deleteRow(row) {
     const label = row.name || row.nickname || row.title || row.key || row.id;
@@ -279,7 +305,7 @@ function fieldsFor(page,subtab) {
       {name:'homeTeamId',label:'Команда 1',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},
       {name:'awayTeamId',label:'Команда 2',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},
       {name:'homeScore',label:'Счёт команды 1',type:'number'},{name:'awayScore',label:'Счёт команды 2',type:'number'},
-      {name:'round',label:'Раунд',type:'number'},{name:'map',label:'Карта'},{name:'winnerId',label:'Команда-победитель',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},{name:'nextMatchId',label:'Следующий матч',type:'remote',endpoint:'/api/matches',valueKey:'id',labelKey:'id'},{name:'completed',label:'Матч завершён',type:'select',options:'boolean'}
+      {name:'round',label:'Раунд',type:'number'},{name:'map',label:'Карта'},{name:'nextMatchId',label:'Следующий матч',type:'remote',endpoint:'/api/matches',valueKey:'id',labelKey:'matchLabel'}
     ],
     'rating-matches': [
       {name:'player1Id',label:'Игрок 1',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname',required:true},
@@ -594,7 +620,7 @@ function emptyMessage(page, subtab) {
 function Toolbar({search,setSearch,sort,setSort,showSort=false}) {
   return <div className="toolbar"><div className="search"><Search size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск…"/></div>{showSort&&<select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Сортировка"><option value="points">Сортировка: по очкам</option><option value="wins">Сортировка: по победам</option><option value="level">Сортировка: по уровню</option></select>}</div>;
 }
-function DataTable({rows,columns,empty,onEdit,onDelete,sortColumn,sortDirection,onSort}) {
+function DataTable({rows,columns,empty,onEdit,onDelete,canEdit,canDelete,onComplete,canComplete,sortColumn,sortDirection,onSort}) {
   const sortedRows = useMemo(() => {
     if (sortColumn == null || !columns?.[sortColumn]) return rows || [];
     const column = columns[sortColumn];
@@ -605,7 +631,7 @@ function DataTable({rows,columns,empty,onEdit,onDelete,sortColumn,sortDirection,
   }, [rows,columns,sortColumn,sortDirection]);
   if (!columns?.length) return <div className="empty-state">Этот экран пока не подключён.</div>;
   if (!sortedRows.length) return <div className="empty-state">{empty}</div>;
-  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}><button type="button" className="sortable-header" onClick={()=>onSort?.(i)} title={'Сортировать: '+label}>{label}<span aria-hidden="true">{sortColumn===i?(sortDirection==='asc'?' ↑':' ↓'):' ↕'}</span></button></th>)}{(onEdit || onDelete) && <th>Действия</th>}</tr></thead><tbody>{sortedRows.map((r,i)=><tr key={r.id||i}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}{(onEdit || onDelete) && <td><div className="row-actions">{onEdit && <button className="icon-btn" title="Редактировать" onClick={() => onEdit(r)}><Pencil size={15}/></button>}{onDelete && <button className="icon-btn danger-btn" title="Удалить" onClick={() => onDelete(r)}><Trash2 size={15}/></button>}</div></td>}</tr>)}</tbody></table></div>;
+  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}><button type="button" className="sortable-header" onClick={()=>onSort?.(i)} title={'Сортировать: '+label}>{label}<span aria-hidden="true">{sortColumn===i?(sortDirection==='asc'?' ↑':' ↓'):' ↕'}</span></button></th>)}{(onEdit || onDelete || onComplete) && <th>Действия</th>}</tr></thead><tbody>{sortedRows.map((r,i)=><tr key={r.id||i}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}{(onEdit || onDelete || onComplete) && <td><div className="row-actions">{onEdit && (!canEdit || canEdit(r)) && <button className="icon-btn" title="Редактировать" onClick={() => onEdit(r)}><Pencil size={15}/></button>}{onDelete && (!canDelete || canDelete(r)) && <button className="icon-btn danger-btn" title="Удалить" onClick={() => onDelete(r)}><Trash2 size={15}/></button>}{onComplete && !r.completed && <button className="icon-btn complete-btn" title={canComplete && !canComplete(r)?'Сначала укажите две команды и неравный счёт':'Завершить матч'} disabled={Boolean(canComplete && !canComplete(r))} onClick={() => onComplete(r)}><CheckCircle2 size={15}/></button>}{onEdit && canEdit && !canEdit(r) && <span className="locked-row">Зафиксирован</span>}</div></td>}</tr>)}</tbody></table></div>;
 }
 function columnsFor(page, subtab) {
   const map = {

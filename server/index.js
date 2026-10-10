@@ -175,6 +175,131 @@ app.get('/api/simulations', (_req, res) => {
 
 const crypto = require('node:crypto');
 
+// Ranked-match mechanics are driven by RatingMatch and GameConfig.match_win from the original SQL schema.
+function rankedRules() {
+  const row = db.prepare("SELECT value FROM GameConfig WHERE key='match_win'").get();
+  let value = {};
+  try { value = JSON.parse(row?.value || '{}'); } catch { throw new Error('Правило match_win в GameConfig содержит некорректный JSON.'); }
+  const rules = {
+    playerPoints: Number(value.playerPoints ?? 5),
+    playerMMR: Number(value.playerMMR ?? 50),
+    playerMMRLoss: Number(value.playerMMR_Loss ?? -25)
+  };
+  if (!Object.values(rules).every(Number.isFinite)) throw new Error('Правило match_win содержит некорректные числовые значения.');
+  return rules;
+}
+function rankedMaps() {
+  return db.prepare('SELECT name FROM Map WHERE playersCount=2 ORDER BY name').all().map(row => row.name);
+}
+function allRankedPlayers() {
+  return db.prepare(`SELECT id,nickname,COALESCE(ratingPoints,0) AS ratingPoints,
+    COALESCE(ratingGames,0) AS ratingGames,COALESCE(ratingWins,0) AS ratingWins,
+    COALESCE(ratingLosses,0) AS ratingLosses,COALESCE(rpPoints,0) AS rpPoints,
+    COALESCE(rpPeak,0) AS rpPeak FROM Player ORDER BY ratingGames ASC,nickname COLLATE NOCASE ASC`).all();
+}
+function chooseRankedPair(players, usedPairs = new Set(), busyIds = new Set()) {
+  const available = players.filter(player => !busyIds.has(player.id));
+  if (available.length < 2) return null;
+  const lowestGames = Math.min(...available.map(player => player.ratingGames));
+  const initiators = available.filter(player => player.ratingGames <= lowestGames + 3);
+  const first = initiators[Math.floor(Math.random() * initiators.length)];
+  let opponents = available.filter(player => player.id !== first.id && !usedPairs.has([first.id,player.id].sort().join(':')));
+  if (!opponents.length) opponents = available.filter(player => player.id !== first.id);
+  opponents.sort((a,b) => Math.abs(a.ratingPoints-first.ratingPoints)-Math.abs(b.ratingPoints-first.ratingPoints) || a.ratingGames-b.ratingGames);
+  const best = opponents.slice(0,Math.min(5,opponents.length));
+  const second = best[Math.floor(Math.random() * best.length)];
+  return { first, second, key:[first.id,second.id].sort().join(':') };
+}
+function simulateRankedMatch(match, playersById, rules, nowIso) {
+  const first = playersById.get(match.player1Id) || db.prepare('SELECT id,nickname,ratingPoints,ratingGames,ratingWins,ratingLosses,rpPoints,rpPeak FROM Player WHERE id=?').get(match.player1Id);
+  const second = playersById.get(match.player2Id) || db.prepare('SELECT id,nickname,ratingPoints,ratingGames,ratingWins,ratingLosses,rpPoints,rpPeak FROM Player WHERE id=?').get(match.player2Id);
+  if (!first || !second || first.id === second.id) throw new Error('У рейтингового матча отсутствуют два разных игрока.');
+  const p1 = Number(first.ratingPoints || 0);
+  const p2 = Number(second.ratingPoints || 0);
+  const chance1 = 1 / (1 + Math.pow(10, (p2-p1)/400));
+  const winner = Math.random() < chance1 ? first : second;
+  const loser = winner.id === first.id ? second : first;
+  const winMMR = Math.max(0, Number(winner.ratingPoints || 0) + rules.playerMMR);
+  const loseMMR = Math.max(0, Number(loser.ratingPoints || 0) + rules.playerMMRLoss);
+  const winRP = Math.max(0, Number(winner.rpPoints || 0) + rules.playerPoints);
+  db.prepare('UPDATE Player SET ratingGames=COALESCE(ratingGames,0)+1,ratingWins=COALESCE(ratingWins,0)+1,ratingPoints=?,rpPoints=?,rpPeak=MAX(COALESCE(rpPeak,0),?) WHERE id=?')
+    .run(winMMR,winRP,winRP,winner.id);
+  db.prepare('UPDATE Player SET ratingGames=COALESCE(ratingGames,0)+1,ratingLosses=COALESCE(ratingLosses,0)+1,ratingPoints=? WHERE id=?')
+    .run(loseMMR,loser.id);
+  db.prepare('UPDATE RatingMatch SET completed=1,winnerId=?,updatedAt=? WHERE id=? AND completed=0')
+    .run(winner.id,nowIso,match.id);
+  for (const player of [first,second]) {
+    const fresh = db.prepare('SELECT id,nickname,COALESCE(ratingPoints,0) AS ratingPoints,COALESCE(ratingGames,0) AS ratingGames,COALESCE(ratingWins,0) AS ratingWins,COALESCE(ratingLosses,0) AS ratingLosses,COALESCE(rpPoints,0) AS rpPoints,COALESCE(rpPeak,0) AS rpPeak FROM Player WHERE id=?').get(player.id);
+    playersById.set(player.id,fresh);
+  }
+  return { matchId:match.id, player1:first.nickname, player2:second.nickname, winner:winner.nickname, map:match.map || null };
+}
+app.post('/api/rating-matches/find-opponent', (_req,res) => {
+  try {
+    const result = db.transaction(() => {
+      const players = allRankedPlayers();
+      const busy = new Set(db.prepare('SELECT player1Id AS id FROM RatingMatch WHERE completed=0 UNION SELECT player2Id AS id FROM RatingMatch WHERE completed=0').all().map(row=>row.id));
+      const pair = chooseRankedPair(players,new Set(),busy);
+      if (!pair) throw new Error('Не удалось подобрать пару: нужны минимум два свободных игрока без незавершённых рейтинговых матчей.');
+      const maps = rankedMaps();
+      const map = maps.length ? maps[Math.floor(Math.random()*maps.length)] : null;
+      const now = new Date();
+      const scheduledAt = new Date(now.getTime()+5*60*1000).toISOString();
+      const id = crypto.randomUUID().replace(/-/g,'');
+      const nowIso = now.toISOString();
+      db.prepare('INSERT INTO RatingMatch (id,player1Id,player2Id,scheduledAt,completed,winnerId,createdAt,updatedAt,map) VALUES (?,?,?,?,0,NULL,?,?,?)')
+        .run(id,pair.first.id,pair.second.id,scheduledAt,nowIso,nowIso,map);
+      return { ok:true, match:{id,player1Id:pair.first.id,player2Id:pair.second.id,player1:pair.first.nickname,player2:pair.second.nickname,scheduledAt,completed:0,map}, message:'Соперник найден. Матч добавлен в расписание.' };
+    })();
+    res.status(201).json(result);
+  } catch(error) { res.status(400).json({error:error.message || 'Не удалось подобрать соперника.'}); }
+});
+app.post('/api/rating-matches/simulate-20', (_req,res) => {
+  try {
+    const result = db.transaction(() => {
+      const rules = rankedRules();
+      const maps = rankedMaps();
+      const playersById = new Map(allRankedPlayers().map(player=>[player.id,player]));
+      if (playersById.size < 2) throw new Error('Для симуляции нужны минимум два игрока.');
+      const created = [];
+      const usedPairs = new Set();
+      for (let i=0;i<20;i++) {
+        const players = [...playersById.values()].sort((a,b)=>a.ratingGames-b.ratingGames);
+        const pair = chooseRankedPair(players,usedPairs);
+        if (!pair) throw new Error('Не удалось подобрать игроков для всех 20 матчей.');
+        usedPairs.add(pair.key);
+        const now = new Date(Date.now()+i);
+        const nowIso = now.toISOString();
+        const map = maps.length ? maps[Math.floor(Math.random()*maps.length)] : null;
+        const id = crypto.randomUUID().replace(/-/g,'');
+        db.prepare('INSERT INTO RatingMatch (id,player1Id,player2Id,scheduledAt,completed,winnerId,createdAt,updatedAt,map) VALUES (?,?,?,?,0,NULL,?,?,?)')
+          .run(id,pair.first.id,pair.second.id,nowIso,nowIso,nowIso,map);
+        const played = simulateRankedMatch({id,player1Id:pair.first.id,player2Id:pair.second.id,map},playersById,rules,nowIso);
+        created.push(played);
+      }
+      db.prepare('INSERT INTO Simulation (id,createdAt,input,result) VALUES (?,?,?,?)')
+        .run(crypto.randomUUID().replace(/-/g,''),new Date().toISOString(),JSON.stringify({type:'rating-batch',count:20}),JSON.stringify({count:created.length,matches:created}));
+      return {ok:true,count:created.length,matches:created};
+    })();
+    res.json(result);
+  } catch(error) { res.status(400).json({error:error.message || 'Не удалось провести 20 рейтинговых матчей.'}); }
+});
+app.post('/api/rating-matches/simulate-upcoming', (_req,res) => {
+  try {
+    const result = db.transaction(() => {
+      const rules = rankedRules();
+      const pending = db.prepare('SELECT id,player1Id,player2Id,scheduledAt,map FROM RatingMatch WHERE completed=0 ORDER BY scheduledAt ASC,createdAt ASC LIMIT 20').all();
+      if (!pending.length) return {ok:true,count:0,matches:[],message:'Нет незавершённых рейтинговых матчей для симуляции.'};
+      const playersById = new Map(allRankedPlayers().map(player=>[player.id,player]));
+      const played = pending.map(match=>simulateRankedMatch(match,playersById,rules,new Date().toISOString()));
+      db.prepare('INSERT INTO Simulation (id,createdAt,input,result) VALUES (?,?,?,?)')
+        .run(crypto.randomUUID().replace(/-/g,''),new Date().toISOString(),JSON.stringify({type:'rating-upcoming',count:pending.length}),JSON.stringify({count:played.length,matches:played}));
+      return {ok:true,count:played.length,matches:played,message:'Ближайшие незавершённые матчи симулированы.'};
+    })();
+    res.json(result);
+  } catch(error) { res.status(400).json({error:error.message || 'Не удалось симулировать ближайшие матчи.'}); }
+});
+
 app.post('/api/simulations/run', (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};

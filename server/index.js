@@ -69,6 +69,116 @@ app.get('/api/simulations', (_req, res) => {
   res.json(db.prepare(`SELECT id,createdAt,input,result FROM Simulation ORDER BY createdAt DESC LIMIT 100`).all());
 });
 
+
+const crypto = require('node:crypto');
+
+// Explicit allowlist prevents arbitrary table/column access through API requests.
+const editableEntities = {
+  teams: { table: 'Team', fields: ['name','logoUrl','wins','losses','points','level','bestMap','worstMap'], required: ['name'] },
+  players: { table: 'Player', fields: ['nickname','faction','teamId','experience','wins','ratingPoints','ratingGames','ratingWins','ratingLosses','rpPoints','rpPeak','isTeamCaptain','position','bestMap','worstMap','rankId','matchWins','matchLosses'], required: ['nickname','faction','teamId'] },
+  tournaments: { table: 'Tournament', fields: ['name','description','imageUrl','type','seasonId','seasonNumber','winnerId','winnerName'], required: ['name'] },
+  matches: { table: 'Match', fields: ['tournamentId','homeTeamId','awayTeamId','homeScore','awayScore','winnerId','round','map','completed','nextMatchId','simulationLog'], required: ['tournamentId'] },
+  'rating-matches': { table: 'RatingMatch', fields: ['player1Id','player2Id','scheduledAt','completed','winnerId','map'], required: ['player1Id','player2Id','scheduledAt'] },
+  seasons: { table: 'Season', fields: ['name','startDate','endDate','isActive'], required: ['name'] },
+  maps: { table: 'Map', fields: ['name','imageUrl','description','playersCount'], required: ['name'] },
+  ranks: { table: 'Rank', fields: ['name','description','imageUrl','requiredWins','requiredXP'], required: ['name'] },
+  leagues: { table: 'RatingLeague', fields: ['name','description','imageUrl','requiredPoints','orderIndex'], required: ['name'] },
+  config: { table: 'GameConfig', fields: ['key','value','description'], required: ['key','value'] },
+  news: { table: 'News', fields: ['title','content','relatedMatchId','relatedTournamentId'], required: ['title','content'] },
+  medals: { table: 'Medal', fields: ['name','description','imageUrl'], required: ['name'] },
+  achievements: { table: 'Achievement', fields: ['name','description','imageUrl','teamId','playerId','tournamentId','conditionType','requiredTournamentType'], required: ['name'] }
+};
+const columnCache = new Map();
+function tableColumns(table) {
+  if (!columnCache.has(table)) columnCache.set(table, new Set(db.prepare(`PRAGMA table_info("${table}")`).all().map(x => x.name)));
+  return columnCache.get(table);
+}
+function normalizeField(field, value) {
+  if (value === '' && !['name','nickname','faction','title','content','key','value','type','scheduledAt'].includes(field)) return null;
+  if (['wins','losses','points','level','experience','ratingPoints','ratingGames','ratingWins','ratingLosses','rpPoints','rpPeak','matchWins','matchLosses','homeScore','awayScore','round','playersCount','requiredWins','requiredXP','requiredPoints','orderIndex'].includes(field)) {
+    if (value === null || value === '') return null;
+    const number = Number(value);
+    if (!Number.isFinite(number)) throw new Error('Поле "' + field + '" должно быть числом.');
+    return Math.trunc(number);
+  }
+  if (['isTeamCaptain','completed','isActive'].includes(field)) return value === true || value === 1 || value === '1' || value === 'true' ? 1 : 0;
+  if (value === undefined) return undefined;
+  if (value !== null && typeof value === 'object') return JSON.stringify(value);
+  return value;
+}
+function getEntityConfig(req, res) {
+  const entity = editableEntities[req.params.entity];
+  if (!entity) { res.status(404).json({ error: 'Этот тип записей не поддерживается.' }); return null; }
+  return entity;
+}
+function safeErrorMessage(error) {
+  if (String(error.message).includes('UNIQUE constraint failed')) return 'Такая запись уже существует. Проверьте уникальные поля.';
+  if (String(error.message).includes('FOREIGN KEY constraint failed')) return 'Нельзя сохранить запись: одна из связанных записей не существует или используется другими данными.';
+  if (String(error.message).includes('NOT NULL constraint failed')) return 'Не заполнено обязательное поле.';
+  return error.message || 'Неизвестная ошибка базы данных.';
+}
+app.post('/api/manage/:entity', (req, res) => {
+  const entity = getEntityConfig(req, res);
+  if (!entity) return;
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    for (const field of entity.required) {
+      if (body[field] === undefined || body[field] === null || String(body[field]).trim() === '') {
+        return res.status(400).json({ error: 'Заполните обязательное поле: ' + field });
+      }
+    }
+    const fields = entity.fields.filter(field => body[field] !== undefined);
+    if (!fields.length) return res.status(400).json({ error: 'Нет данных для сохранения.' });
+    const row = {};
+    for (const field of fields) row[field] = normalizeField(field, body[field]);
+    const columns = tableColumns(entity.table);
+    if (columns.has('updatedAt')) row.updatedAt = new Date().toISOString();
+    row.id = crypto.randomUUID().replace(/-/g, '');
+    const keys = Object.keys(row).filter(key => row[key] !== undefined);
+    const sql = `INSERT INTO "${entity.table}" (${keys.map(key => '"' + key + '"').join(',')}) VALUES (${keys.map(() => '?').join(',')})`;
+    db.prepare(sql).run(...keys.map(key => row[key]));
+    const saved = db.prepare(`SELECT * FROM "${entity.table}" WHERE id = ?`).get(row.id);
+    res.status(201).json(saved);
+  } catch (error) {
+    res.status(400).json({ error: safeErrorMessage(error) });
+  }
+});
+app.put('/api/manage/:entity/:id', (req, res) => {
+  const entity = getEntityConfig(req, res);
+  if (!entity) return;
+  try {
+    const exists = db.prepare(`SELECT id FROM "${entity.table}" WHERE id = ?`).get(req.params.id);
+    if (!exists) return res.status(404).json({ error: 'Запись не найдена.' });
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const fields = entity.fields.filter(field => body[field] !== undefined);
+    if (!fields.length) return res.status(400).json({ error: 'Нет полей для обновления.' });
+    for (const field of entity.required) {
+      if (body[field] !== undefined && (body[field] === null || String(body[field]).trim() === '')) {
+        return res.status(400).json({ error: 'Поле обязательно: ' + field });
+      }
+    }
+    const row = {};
+    for (const field of fields) row[field] = normalizeField(field, body[field]);
+    if (tableColumns(entity.table).has('updatedAt')) row.updatedAt = new Date().toISOString();
+    const keys = Object.keys(row).filter(key => row[key] !== undefined);
+    db.prepare(`UPDATE "${entity.table}" SET ${keys.map(key => '"' + key + '" = ?').join(',')} WHERE id = ?`).run(...keys.map(key => row[key]), req.params.id);
+    res.json(db.prepare(`SELECT * FROM "${entity.table}" WHERE id = ?`).get(req.params.id));
+  } catch (error) {
+    res.status(400).json({ error: safeErrorMessage(error) });
+  }
+});
+app.delete('/api/manage/:entity/:id', (req, res) => {
+  const entity = getEntityConfig(req, res);
+  if (!entity) return;
+  try {
+    const result = db.prepare(`DELETE FROM "${entity.table}" WHERE id = ?`).run(req.params.id);
+    if (!result.changes) return res.status(404).json({ error: 'Запись не найдена.' });
+    res.json({ ok: true, deletedId: req.params.id });
+  } catch (error) {
+    res.status(409).json({ error: safeErrorMessage(error) });
+  }
+});
+
 // The original database has no bets table; do not invent betting records or logic.
 
 const dist = path.join(__dirname, '..', 'client', 'dist');

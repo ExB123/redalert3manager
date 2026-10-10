@@ -265,3 +265,6 @@ tbody tr:hover{background:#0a1425}
 .cabinet-find-match .muted{margin:0;line-height:1.5}
 .cabinet-find-match .primary{white-space:nowrap}
 @media(max-width:700px){.cabinet-find-match{align-items:flex-start;flex-direction:column}}
+
+.player-faction-dot{font-size:10px;margin-right:7px;vertical-align:1px}
+.player-ranking-name{white-space:nowrap}

@@ -65,6 +65,12 @@ app.get('/api/medals', (_req, res) => {
 app.get('/api/news', (_req, res) => {
   res.json(db.prepare(`SELECT id,title,content,createdAt,relatedMatchId,relatedTournamentId FROM News ORDER BY createdAt DESC`).all());
 });
+app.get('/api/winner-posts', (_req, res) => {
+  res.json(db.prepare(`SELECT wp.id,wp.tournamentId,wp.teamId,wp.title,wp.content,wp.createdAt,t.name AS tournamentName,tm.name AS teamName FROM WinnerPost wp LEFT JOIN Tournament t ON t.id=wp.tournamentId LEFT JOIN Team tm ON tm.id=wp.teamId ORDER BY wp.createdAt DESC`).all());
+});
+app.get('/api/achievement-showcase', (_req, res) => {
+  res.json(db.prepare(`SELECT id,name,description,imageUrl,createdAt FROM AchievementShowcase ORDER BY createdAt DESC`).all());
+});
 app.get('/api/simulations', (_req, res) => {
   res.json(db.prepare(`SELECT id,createdAt,input,result FROM Simulation ORDER BY createdAt DESC LIMIT 100`).all());
 });
@@ -86,7 +92,9 @@ const editableEntities = {
   config: { table: 'GameConfig', fields: ['key','value','description'], required: ['key','value'] },
   news: { table: 'News', fields: ['title','content','relatedMatchId','relatedTournamentId'], required: ['title','content'] },
   medals: { table: 'Medal', fields: ['name','description','imageUrl'], required: ['name'] },
-  achievements: { table: 'Achievement', fields: ['name','description','imageUrl','teamId','playerId','tournamentId','conditionType','requiredTournamentType'], required: ['name'] }
+  achievements: { table: 'Achievement', fields: ['name','description','imageUrl','teamId','playerId','tournamentId','conditionType','requiredTournamentType'], required: ['name'] },
+  'winner-posts': { table: 'WinnerPost', fields: ['tournamentId','teamId','title','content'], required: ['tournamentId','teamId','title','content'] },
+  'achievement-showcase': { table: 'AchievementShowcase', fields: ['name','description','imageUrl'], required: ['name'] }
 };
 const columnCache = new Map();
 function tableColumns(table) {

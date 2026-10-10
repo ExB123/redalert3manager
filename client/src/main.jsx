@@ -151,7 +151,7 @@ function App() {
     sectionTitle = subtab;
     if (subtab === 'Информация о лигах') columns = [['#',(_,i)=>i+1],['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="league"/>],['Лига','name'],['Минимум очков','requiredPoints'],['Описание','description']];
     else if (subtab === 'Рейтинговые матчи') columns = [['Игрок 1','player1'],['Игрок 2','player2'],['Дата','scheduledAt'],['Карта','map'],['Победитель','winner'],['Завершён',r=>bool(r.completed)]];
-    else if (subtab === 'Лучшие игроки') columns = [['Место',(_,i)=>i+1],['Игрок','nickname'],['Фракция',r=><FactionName value={r.faction}/>],['Команда','teamName'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Победы','ratingWins'],['Поражения','ratingLosses'],['Звание',r=><span className="rank-cell"><ImageCell src={r.rankImageUrl} alt={r.rankName} type="rank"/>{fmt(r.rankName)}</span>]];
+    else if (subtab === 'Лучшие игроки') columns = [['#',(_,i)=>i+1],['Игрок',r=><span className="player-ranking-name"><FactionName value={r.faction}/>{r.nickname}</span>],['Команда','teamName'],['RP','rpPoints'],['Рейтинговые победы','ratingWins'],['Лучшая карта',r=>r.bestMap||'—']];
     else if (subtab === 'Статистика фракций') columns = [['Фракция','faction'],['Игроков','players'],['Победы в матчах','wins'],['Поражения в матчах','losses'],['Рейтинговые победы','ratingWins'],['Рейтинговые поражения','ratingLosses'],['Средний RP','averageRP'],['Максимальный пиковый RP','peakRP']];
     else columns = [];
   } else if (page === 'maps' && subtab === 'Статистика карт') columns = [['Карта',r=>r.map || r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']];
@@ -224,7 +224,7 @@ function App() {
               <p className="muted">Загрузка…</p>
             ) : (
               <DataTable
-                rows={visibleData}
+                rows={page === 'league' && subtab === 'Лучшие игроки' ? visibleData.slice(0,10) : visibleData}
                 columns={columns}
                 podium={page === 'rating' && subtab === 'Рейтинг Команд'}
                 empty={emptyMessage(page,subtab)}

@@ -29,6 +29,9 @@ app.get('/api/teams', (_req, res) => {
 app.get('/api/players', (_req, res) => {
   res.json(db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.experience,p.wins,p.ratingPoints,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.rpPeak,p.position,p.bestMap,p.worstMap,p.matchWins,p.matchLosses,t.name AS teamName,r.name AS rankName,r.imageUrl AS rankImageUrl FROM Player p LEFT JOIN Team t ON t.id=p.teamId LEFT JOIN Rank r ON r.id=p.rankId ORDER BY p.rpPoints DESC, p.ratingPoints DESC, p.nickname ASC`).all());
 });
+app.get('/api/faction-stats', (_req, res) => {
+  res.json(db.prepare(`SELECT faction,COUNT(*) AS players,SUM(COALESCE(wins,0)) AS wins,SUM(COALESCE(ratingWins,0)) AS ratingWins,SUM(COALESCE(ratingLosses,0)) AS ratingLosses,ROUND(AVG(COALESCE(rpPoints,0)),1) AS averageRP,MAX(COALESCE(rpPeak,0)) AS peakRP FROM Player WHERE faction IS NOT NULL AND TRIM(faction) <> '' GROUP BY faction ORDER BY players DESC,faction ASC`).all());
+});
 app.get('/api/tournaments', (_req, res) => {
   res.json(db.prepare(`SELECT id,name,description,imageUrl,type,seasonId,createdAt,seasonNumber,winnerId,winnerName FROM Tournament ORDER BY createdAt DESC`).all());
 });

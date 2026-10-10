@@ -35,3 +35,9 @@
 .secondary:hover{background:#192944}
 .primary:disabled{opacity:.6;cursor:wait}
 @media(max-width:760px){.panel-tools{width:100%;justify-content:stretch}.panel-tools>.primary{width:100%}.form-grid{grid-template-columns:1fr}.crud-modal{padding:16px}.modal-backdrop{padding:8px}.modal-actions{position:sticky;bottom:-16px;background:#071120;padding:12px 0 2px}}
+
+/* Match simulator */
+.simulator-box{margin:0 0 28px;padding:20px;border:1px solid #283750;border-radius:10px;background:linear-gradient(145deg,#071426,#040b17)}
+.simulator-box h3{font-size:19px;margin:0 0 8px;color:#f1f5fb}
+.simulator-box .muted{margin-bottom:18px}
+.simulator-box .modal-actions{margin-top:16px}

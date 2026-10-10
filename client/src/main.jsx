@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Coins, Award, Info, Map, CalendarDays, ChartNoAxesColumn, Layers, FlaskConical, ContactRound, UsersRound, Swords, Trophy, Search, RefreshCw, House, ChevronRight, CircleAlert } from 'lucide-react';
+import { Coins, Award, Info, Map, CalendarDays, ChartNoAxesColumn, Layers, FlaskConical, ContactRound, UsersRound, Swords, Trophy, Search, RefreshCw, House, ChevronRight, CircleAlert, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
 import './style.css';
 
 const nav = [
@@ -26,6 +26,8 @@ function App() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('rpPoints');
+  const [crudDialog, setCrudDialog] = useState(null);
+  const [actionMessage, setActionMessage] = useState('');
 
   const ratingTabs = ['Рейтинг Команд','Рейтинг Игроков','Рейтинг Альянс','Рейтинг Союз','Рейтинг Империя'];
   const leagueTabs = ['Информация о лигах','Рейтинговые матчи','Лучшие игроки','Кабинет игрока','Статистика фракций'];
@@ -116,9 +118,9 @@ function App() {
     ? 'В исходной SQL-базе нет таблицы ставок. Раздел нельзя корректно включить без согласования правил и структуры данных.'
     : page === 'league' && (subtab === 'Кабинет игрока' || subtab === 'Статистика фракций')
       ? (subtab === 'Кабинет игрока' ? 'Личный кабинет требует авторизации игроков. В этой версии авторизация ещё не реализована.' : 'Выберите фракцию в рейтинге, чтобы посмотреть список игроков. Сводную статистику фракций добавим отдельно.')
-      : page === 'info' && subtab === 'Информация'
-        ? 'Раздел для новостей турниров. В исходной базе таблица новостей пока пустая.'
-        : null;
+      : null;
+  const crudEntity = entityFor(page, subtab);
+  const crudFields = fieldsFor(page, subtab);
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -141,15 +143,191 @@ function App() {
           {page === 'info' && <div className="tabs">{['Информация','Достижения','Медали'].map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           <section className="panel">
             <div className="panel-head"><div><h2>{sectionTitle}</h2><p className="muted">Данные читаются из локальной SQL-базы независимой версии.</p></div>
-              {page !== 'bets' && !(page==='league' && ['Кабинет игрока','Статистика фракций'].includes(subtab)) && <Toolbar search={search} setSearch={setSearch} sort={sort} setSort={setSort} showSort={page==='teams'}/>}
+              <div className="panel-tools">
+                {crudEntity && <button className="primary" onClick={() => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row: null, fields: crudFields }); }}><Plus size={16}/>Добавить</button>}
+                {page !== 'bets' && !(page==='league' && ['Кабинет игрока','Статистика фракций'].includes(subtab)) && <Toolbar search={search} setSearch={setSearch} sort={sort} setSort={setSort} showSort={page==='teams'}/>}
+              </div>
             </div>
             {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
-            {specialPlaceholder ? <div className="empty-state">{specialPlaceholder}</div> : loading ? <p className="muted">Загрузка…</p> : <DataTable rows={visibleData} columns={columns} empty={emptyMessage(page,subtab)}/>}
+            {actionMessage && <div className="success-message">{actionMessage}</div>}
+            {specialPlaceholder ? <div className="empty-state">{specialPlaceholder}</div> : loading ? <p className="muted">Загрузка…</p> : <DataTable rows={visibleData} columns={columns} empty={emptyMessage(page,subtab)} onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null} onDelete={crudEntity ? deleteRow : null}/>}
           </section>
         </>}
         <footer>Red Alert Tournament Manager <span>· независимая версия</span></footer>
       </div>
     </main>
+    {crudDialog && <CrudDialog entity={crudDialog.entity} row={crudDialog.row} fields={crudDialog.fields} onClose={() => setCrudDialog(null)} onSaved={async message => { setCrudDialog(null); setActionMessage(message); await load(); }}/>}
+  </div>;
+
+  async function deleteRow(row) {
+    if (!window.confirm('Удалить запись «' + (row.name || row.nickname || row.title || row.key || row.id) + '»? Это действие нельзя отменить.')) return;
+    try {
+      const response = await fetch('/api/manage/' + crudEntity + '/' + encodeURIComponent(row.id), { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));
+      setActionMessage('Запись удалена.');
+      await load();
+    } catch (e) {
+      setActionMessage('Не удалось удалить запись: ' + e.message);
+    }
+  }
+}
+
+const staticOptions = {
+  faction: [{value:'Альянс',label:'Альянс'},{value:'Союз',label:'Союз'},{value:'Империя',label:'Империя'}],
+  type: ['Champions League','Grand League','Astra League','Ultimate League','FFA League'].map(value=>({value,label:value})),
+  position: ['Игрок','Капитан','Тренер','Менеджер'].map(value=>({value,label:value})),
+  boolean: [{value:'0',label:'Нет'},{value:'1',label:'Да'}]
+};
+function entityFor(page,subtab) {
+  if (page==='rating') return subtab==='Рейтинг Команд' ? 'teams' : 'players';
+  if (page==='teams') return 'teams';
+  if (page==='players') return 'players';
+  if (page==='tournaments') return 'tournaments';
+  if (page==='matches') return 'matches';
+  if (page==='seasons') return 'seasons';
+  if (page==='maps' && subtab==='Карты') return 'maps';
+  if (page==='ranks') return 'ranks';
+  if (page==='config') return 'config';
+  if (page==='info' && subtab==='Информация') return 'news';
+  if (page==='info' && subtab==='Достижения') return 'achievements';
+  if (page==='info' && subtab==='Медали') return 'medals';
+  if (page==='league' && subtab==='Информация о лигах') return 'leagues';
+  if (page==='league' && subtab==='Рейтинговые матчи') return 'rating-matches';
+  if (page==='league' && subtab==='Лучшие игроки') return 'players';
+  return null;
+}
+function fieldsFor(page,subtab) {
+  const definitions = {
+    teams: [
+      {name:'name',label:'Название команды',required:true},{name:'logoUrl',label:'Ссылка на логотип'},
+      {name:'points',label:'Очки',type:'number'},{name:'wins',label:'Победы',type:'number'},{name:'losses',label:'Поражения',type:'number'},
+      {name:'level',label:'Уровень',type:'number'},{name:'bestMap',label:'Лучшая карта'},{name:'worstMap',label:'Худшая карта'}
+    ],
+    players: [
+      {name:'nickname',label:'Ник игрока',required:true},{name:'faction',label:'Фракция',type:'select',options:'faction',required:true},
+      {name:'teamId',label:'Команда',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name',required:true},
+      {name:'rankId',label:'Звание',type:'remote',endpoint:'/api/ranks',valueKey:'id',labelKey:'name'},
+      {name:'experience',label:'Опыт',type:'number'},{name:'wins',label:'Победы',type:'number'},
+      {name:'ratingPoints',label:'Рейтинговые очки',type:'number'},{name:'ratingGames',label:'Рейтинговые игры',type:'number'},
+      {name:'ratingWins',label:'Рейтинговые победы',type:'number'},{name:'ratingLosses',label:'Рейтинговые поражения',type:'number'},
+      {name:'rpPoints',label:'RP',type:'number'},{name:'rpPeak',label:'Пиковый RP',type:'number'},
+      {name:'isTeamCaptain',label:'Капитан команды',type:'select',options:'boolean'},
+      {name:'position',label:'Позиция',type:'select',options:'position'},{name:'bestMap',label:'Лучшая карта'},{name:'worstMap',label:'Худшая карта'}
+    ],
+    tournaments: [
+      {name:'name',label:'Название турнира',required:true},{name:'type',label:'Тип турнира',type:'select',options:'type',required:true},
+      {name:'description',label:'Описание',type:'textarea'},{name:'imageUrl',label:'Ссылка на изображение'},
+      {name:'seasonId',label:'Сезон',type:'remote',endpoint:'/api/seasons',valueKey:'id',labelKey:'name'},
+      {name:'seasonNumber',label:'Номер сезона'},{name:'winnerName',label:'Победитель'}
+    ],
+    matches: [
+      {name:'tournamentId',label:'Турнир',type:'remote',endpoint:'/api/tournaments',valueKey:'id',labelKey:'name',required:true},
+      {name:'homeTeamId',label:'Команда 1',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},
+      {name:'awayTeamId',label:'Команда 2',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},
+      {name:'homeScore',label:'Счёт команды 1',type:'number'},{name:'awayScore',label:'Счёт команды 2',type:'number'},
+      {name:'round',label:'Раунд',type:'number'},{name:'map',label:'Карта'},{name:'completed',label:'Матч завершён',type:'select',options:'boolean'}
+    ],
+    'rating-matches': [
+      {name:'player1Id',label:'Игрок 1',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname',required:true},
+      {name:'player2Id',label:'Игрок 2',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname',required:true},
+      {name:'scheduledAt',label:'Дата и время',type:'datetime-local',required:true},{name:'map',label:'Карта'},
+      {name:'completed',label:'Матч завершён',type:'select',options:'boolean'},
+      {name:'winnerId',label:'Победитель',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname'}
+    ],
+    seasons: [
+      {name:'name',label:'Название сезона',required:true},{name:'startDate',label:'Начало',type:'datetime-local',required:true},
+      {name:'endDate',label:'Окончание',type:'datetime-local'},{name:'isActive',label:'Активен',type:'select',options:'boolean'}
+    ],
+    maps: [
+      {name:'name',label:'Название карты',required:true},{name:'imageUrl',label:'Ссылка на изображение'},
+      {name:'description',label:'Описание',type:'textarea'},{name:'playersCount',label:'Количество игроков',type:'number',required:true}
+    ],
+    ranks: [
+      {name:'name',label:'Название звания',required:true},{name:'description',label:'Описание',type:'textarea'},
+      {name:'imageUrl',label:'Ссылка на эмблему'},{name:'requiredWins',label:'Победы для получения',type:'number',required:true},
+      {name:'requiredXP',label:'Опыт для получения',type:'number',required:true}
+    ],
+    leagues: [
+      {name:'name',label:'Название лиги',required:true},{name:'description',label:'Описание',type:'textarea'},
+      {name:'imageUrl',label:'Ссылка на эмблему'},{name:'requiredPoints',label:'Минимум очков',type:'number',required:true},
+      {name:'orderIndex',label:'Порядок отображения',type:'number',required:true}
+    ],
+    config: [{name:'key',label:'Ключ параметра',required:true},{name:'value',label:'Значение',required:true},{name:'description',label:'Описание',type:'textarea'}],
+    news: [{name:'title',label:'Заголовок',required:true},{name:'content',label:'Текст новости',type:'textarea',required:true}],
+    medals: [{name:'name',label:'Название медали',required:true},{name:'description',label:'Описание',type:'textarea'},{name:'imageUrl',label:'Ссылка на изображение'}],
+    achievements: [
+      {name:'name',label:'Название достижения',required:true},{name:'description',label:'Описание',type:'textarea'},
+      {name:'imageUrl',label:'Ссылка на изображение'},{name:'conditionType',label:'Тип условия'},
+      {name:'requiredTournamentType',label:'Требуемый тип турнира',type:'select',options:'type'},
+      {name:'teamId',label:'Команда',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},
+      {name:'playerId',label:'Игрок',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname'},
+      {name:'tournamentId',label:'Турнир',type:'remote',endpoint:'/api/tournaments',valueKey:'id',labelKey:'name'}
+    ]
+  };
+  return definitions[entityFor(page,subtab)] || [];
+}
+function CrudDialog({entity,row,fields,onClose,onSaved}) {
+  const [values,setValues] = useState(() => {
+    const initial = {};
+    for (const field of fields) {
+      let value = row?.[field.name] ?? '';
+      if (field.type==='datetime-local' && value) value = String(value).slice(0,16);
+      if (field.type==='select' && field.options==='boolean' && value !== '') value = String(Number(Boolean(value)));
+      initial[field.name] = value;
+    }
+    return initial;
+  });
+  const [options,setOptions] = useState({});
+  const [saving,setSaving] = useState(false);
+  const [error,setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    const endpoints = [...new Set(fields.filter(f=>f.type==='remote').map(f=>f.endpoint))];
+    Promise.all(endpoints.map(async endpoint => {
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error('Не удалось загрузить варианты для формы.');
+      return [endpoint,await response.json()];
+    })).then(entries => { if (active) setOptions(Object.fromEntries(entries)); })
+      .catch(e => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, [fields]);
+  async function submit(event) {
+    event.preventDefault();
+    setSaving(true); setError('');
+    const payload = {...values};
+    for (const field of fields) {
+      if (field.type==='number') payload[field.name] = payload[field.name] === '' ? null : Number(payload[field.name]);
+      if (field.type==='select' && field.options==='boolean') payload[field.name] = payload[field.name] === '1';
+      if (field.type==='datetime-local' && payload[field.name]) payload[field.name] = new Date(payload[field.name]).toISOString();
+      if (payload[field.name] === '') payload[field.name] = null;
+    }
+    try {
+      const response = await fetch('/api/manage/'+entity+(row ? '/'+encodeURIComponent(row.id) : ''), {
+        method: row ? 'PUT' : 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Не удалось сохранить запись.');
+      await onSaved(row ? 'Изменения сохранены.' : 'Запись добавлена.');
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+  return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target===event.currentTarget) onClose(); }}>
+    <section className="crud-modal" role="dialog" aria-modal="true" aria-label={row ? 'Редактирование записи' : 'Добавление записи'}>
+      <div className="modal-head"><h2>{row ? 'Редактировать запись' : 'Добавить запись'}</h2><button type="button" className="icon-btn" onClick={onClose} title="Закрыть"><X size={17}/></button></div>
+      <form onSubmit={submit}>
+        <div className="form-grid">
+          {fields.map(field => <label className="form-field" key={field.name}><span>{field.label}{field.required ? ' *' : ''}</span>
+            {field.type==='textarea' ? <textarea required={field.required} value={values[field.name] ?? ''} onChange={e=>setValues(v=>({...v,[field.name]:e.target.value}))} rows={3}/>
+            : field.type==='select' ? <select required={field.required} value={values[field.name] ?? ''} onChange={e=>setValues(v=>({...v,[field.name]:e.target.value}))}><option value="">— Не выбрано —</option>{(staticOptions[field.options] || []).map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select>
+            : field.type==='remote' ? <select required={field.required} value={values[field.name] ?? ''} onChange={e=>setValues(v=>({...v,[field.name]:e.target.value}))}><option value="">— Не выбрано —</option>{(options[field.endpoint] || []).map(option=><option key={option[field.valueKey]} value={option[field.valueKey]}>{option[field.labelKey]}</option>)}</select>
+            : <input required={field.required} type={field.type || 'text'} value={values[field.name] ?? ''} onChange={e=>setValues(v=>({...v,[field.name]:e.target.value}))}/>}
+          </label>)}
+        </div>
+        {error && <div className="error"><CircleAlert size={16}/>{error}</div>}
+        <div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>Отмена</button><button type="submit" className="primary" disabled={saving}><Save size={16}/>{saving?'Сохранение…':'Сохранить'}</button></div>
+      </form>
+    </section>
   </div>;
 }
 
@@ -172,10 +350,10 @@ function emptyMessage(page, subtab) {
 function Toolbar({search,setSearch,sort,setSort,showSort=false}) {
   return <div className="toolbar"><div className="search"><Search size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск…"/></div>{showSort&&<select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Сортировка"><option value="points">Сортировка: по очкам</option><option value="wins">Сортировка: по победам</option><option value="level">Сортировка: по уровню</option></select>}</div>;
 }
-function DataTable({rows,columns,empty}) {
+function DataTable({rows,columns,empty,onEdit,onDelete}) {
   if (!columns?.length) return <div className="empty-state">Этот экран пока не подключён.</div>;
   if (!rows?.length) return <div className="empty-state">{empty}</div>;
-  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}>{label}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={r.id||i}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}</tr>)}</tbody></table></div>;
+  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}>{label}</th>)}{(onEdit || onDelete) && <th>Действия</th>}</tr></thead><tbody>{rows.map((r,i)=><tr key={r.id||i}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}{(onEdit || onDelete) && <td><div className="row-actions">{onEdit && <button className="icon-btn" title="Редактировать" onClick={() => onEdit(r)}><Pencil size={15}/></button>}{onDelete && <button className="icon-btn danger-btn" title="Удалить" onClick={() => onDelete(r)}><Trash2 size={15}/></button>}</div></td>}</tr>)}</tbody></table></div>;
 }
 function columnsFor(page, subtab) {
   const map = {

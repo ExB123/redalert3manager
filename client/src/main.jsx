@@ -193,6 +193,7 @@ function App() {
             </div>}
             {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
             {actionMessage && <div className="success-message">{actionMessage}</div>}
+            {page === 'config' && !loading && <CurrencySummary rows={visibleData} />}
             {page === 'simulator' && (
               <SimulatorPanel onComplete={async winner => {
                 setActionMessage('Симуляция завершена. Победитель: ' + winner);
@@ -473,6 +474,24 @@ function CrudDialog({entity,row,fields,onClose,onSaved}) {
         <div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>Отмена</button><button type="submit" className="primary" disabled={saving}><Save size={16}/>{saving?'Сохранение…':'Сохранить'}</button></div>
       </form>
     </section>
+  </div>;
+}
+
+function CurrencySummary({rows}) {
+  const relevant = rows.filter(row => /currency|income|cost|forecast|money|credit|econom|валют|доход|стоим|прогноз|денег|кредит/i.test(String(row.key||'')+' '+String(row.description||'')));
+  const labelFor = row => {
+    const source = String(row.description || row.key || '').trim();
+    if (/income|доход/i.test(source)) return 'Доход';
+    if (/cost|стоим|расход/i.test(source)) return 'Стоимость / расход';
+    if (/forecast|прогноз/i.test(source)) return 'Прогноз';
+    if (/currency|валют/i.test(source)) return 'Валюта';
+    if (/credit|money|денег|кредит/i.test(source)) return 'Денежный параметр';
+    return source || 'Параметр';
+  };
+  return <div className="currency-summary">
+    <div className="currency-summary-head"><div><h3>Параметры валюты и экономики</h3><p className="muted">Значения берутся из GameConfig. Здесь отображаются только параметры, реально сохранённые в базе.</p></div><span>{relevant.length} параметров</span></div>
+    {relevant.length ? <div className="currency-cards">{relevant.map(row=><article className="currency-card" key={row.id||row.key}><span>{labelFor(row)}</span><strong>{row.value}</strong><small>{row.description || row.key}</small></article>)}</div>
+      : <div className="currency-empty">В GameConfig не найдено отдельных полей дохода, стоимости или прогноза. Не подставляю вымышленные суммы: ниже доступна полная таблица параметров, где можно проверить и изменить существующие значения.</div>}
   </div>;
 }
 

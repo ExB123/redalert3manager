@@ -27,6 +27,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('points');
   const [crudDialog, setCrudDialog] = useState(null);
+  const [teamAnalytics, setTeamAnalytics] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
   const [rankedBusy, setRankedBusy] = useState(false);
   const [tableSort, setTableSort] = useState({ column: null, direction: 'asc' });
@@ -145,7 +146,7 @@ function App() {
     sectionTitle = subtab;
     columns = subtab === 'Рейтинг Команд' ? [
       ['Место',(_,i)=>i+1],['Команда',r=><span className="team-name"><ImageCell src={r.logoUrl} alt={r.name} type="team"/>{r.name}</span>],
-      ['Сыграно игр',r=>(r.wins||0)+(r.losses||0)],['Очки',r=>r.points],['Победы',r=>r.wins],['Поражения',r=>r.losses],['Уровень',r=>r.level]
+      ['Сыграно игр',r=>(r.wins||0)+(r.losses||0)],['Очки',r=>r.points],['MMR',r=>Number(r.points||0)*2],['Победы',r=>r.wins],['Поражения',r=>r.losses],['Уровень',r=>r.level],['Аналитика',r=><button className="ranked-secondary currency-analytics-btn" onClick={()=>setTeamAnalytics(r)}>Аналитика</button>]
     ] : [['Место',(_,i)=>i+1],['Игрок','nickname'],['Фракция',r=><FactionName value={r.faction}/>],['Команда','teamName'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Победы','ratingWins'],['Поражения','ratingLosses'],['Звание',r=><span className="rank-cell"><ImageCell src={r.rankImageUrl} alt={r.rankName} type="rank"/>{fmt(r.rankName)}</span>]];
   } else if (page === 'league') {
     sectionTitle = subtab;
@@ -256,6 +257,11 @@ function App() {
         <footer>Red Alert Tournament Manager <span>· независимая версия</span></footer>
       </div>
     </main>
+    {teamAnalytics && <div className="modal-backdrop" onClick={() => setTeamAnalytics(null)}><div className="modal currency-detail-modal" onClick={e => e.stopPropagation()}>
+      <div className="modal-head"><h2>Аналитика команды: {teamAnalytics.name}</h2><button className="icon-btn" onClick={() => setTeamAnalytics(null)}><X size={18}/></button></div>
+      <div className="currency-detail-grid">{[['Сыграно игр',Number(teamAnalytics.wins||0)+Number(teamAnalytics.losses||0)],['Очки',teamAnalytics.points||0],['MMR',Number(teamAnalytics.points||0)*2],['Победы',teamAnalytics.wins||0],['Поражения',teamAnalytics.losses||0],['Уровень',teamAnalytics.level||0],['Лучшая карта',teamAnalytics.bestMap||'—'],['Худшая карта',teamAnalytics.worstMap||'—']].map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
+      <p className="muted">MMR отображается по формуле из предоставленного образца: очки команды × 2.</p>
+    </div></div>}
     {crudDialog && <CrudDialog entity={crudDialog.entity} row={crudDialog.row} fields={crudDialog.fields} onClose={() => setCrudDialog(null)} onSaved={async message => { setCrudDialog(null); setActionMessage(message); await load(); }}/>}
   </div>;
 

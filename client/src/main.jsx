@@ -206,6 +206,8 @@ function App() {
             )}
             {page === 'settings' ? null : page === 'league' && subtab === 'Кабинет игрока' ? (
               loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={data} />
+            ) : page === 'league' && subtab === 'Рейтинговые матчи' ? (
+              loading ? <p className="muted">Загрузка рейтинговых матчей…</p> : <RatingMatchesTable rows={visibleData} onComplete={async () => { await load(); }} />
             ) : page === 'maps' && subtab === 'Статистика карт' ? (
               loading ? <p className="muted">Загрузка статистики карт…</p> : <MapStatsPanel rows={visibleData} />
             ) : page === 'league' && subtab === 'Статистика фракций' ? (
@@ -547,6 +549,35 @@ function SimulatorPanel({onComplete}) {
       {error && <div className="error"><CircleAlert size={16}/>{error}</div>}
       <div className="modal-actions"><button className="primary" type="submit" disabled={busy || !teams.length}>{busy?'Симуляция…':'Провести симуляцию'}</button></div>
     </form>
+  </div>;
+}
+
+function RatingMatchesTable({rows,onComplete}) {
+  const [busyId,setBusyId] = useState('');
+  const [error,setError] = useState('');
+  async function complete(match,winnerId) {
+    const winner = winnerId===match.player1Id ? match.player1 : match.player2;
+    if (!window.confirm('Зафиксировать победу игрока '+winner+'? Рейтинги и статистика будут изменены.')) return;
+    setBusyId(match.id); setError('');
+    try {
+      const response = await fetch('/api/rating-matches/'+encodeURIComponent(match.id)+'/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({winnerId})});
+      const result = await response.json();
+      if(!response.ok) throw new Error(result.error || 'Не удалось завершить рейтинговый матч.');
+      await onComplete?.();
+    } catch(e) { setError(e.message); }
+    finally { setBusyId(''); }
+  }
+  if(!rows.length) return <div className="empty-state">Рейтинговых матчей пока нет. Используйте «Найти соперника» или симуляцию, чтобы создать матчи.</div>;
+  return <div className="rating-match-list">
+    {error && <div className="error"><CircleAlert size={16}/>{error}</div>}
+    {rows.map(match=><article className={'rating-match-card '+(match.completed?'is-completed':'')} key={match.id}>
+      <div className="rating-match-meta"><span>{match.map || 'Карта не выбрана'}</span><time>{match.scheduledAt ? new Date(match.scheduledAt).toLocaleString() : 'Дата не указана'}</time></div>
+      <div className="rating-match-versus"><div><small>Игрок 1</small><strong>{match.player1 || 'Неизвестен'}</strong></div><span>VS</span><div><small>Игрок 2</small><strong>{match.player2 || 'Неизвестен'}</strong></div></div>
+      <div className="rating-match-footer">{match.completed
+        ? <span className="match-result win">Завершён · Победитель: {match.winner || 'не указан'}</span>
+        : <><span className="muted">Матч ожидает результата</span><div className="rating-match-actions"><button type="button" className="ranked-secondary" disabled={Boolean(busyId)} onClick={()=>complete(match,match.player1Id)}>{busyId===match.id?'Сохранение…':'Победа '+(match.player1||'игрока 1')}</button><button type="button" className="ranked-secondary" disabled={Boolean(busyId)} onClick={()=>complete(match,match.player2Id)}>{busyId===match.id?'Сохранение…':'Победа '+(match.player2||'игрока 2')}</button></div></>}
+      </div>
+    </article>)}
   </div>;
 }
 

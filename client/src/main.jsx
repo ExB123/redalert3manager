@@ -574,7 +574,7 @@ function FactionStatsPanel({rows}) {
     </div>
     <div className="faction-comparison">{factions.map((faction,index)=>{
       const top=players.filter(player=>player.faction===faction.faction).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,3);
-      return <section className="faction-card" key={faction.faction}><div className="faction-card-head"><div><span className="faction-index">0{index+1}</span><h3>{faction.faction}</h3></div><strong>{faction.winRate}% <small>побед</small></strong></div>
+      return <section className="faction-card" key={faction.faction}><div className="faction-card-head"><div><span className="faction-index">0{index+1}</span><h3><FactionName value={faction.faction}/></h3></div><strong>{faction.winRate}% <small>побед</small></strong></div>
         <div className="faction-meter"><span style={{width:faction.winRate+'%'}}/></div>
         <div className="faction-metrics"><div><span>Победы</span><strong>{faction.wins||0}</strong></div><div><span>Поражения</span><strong>{faction.losses||0}</strong></div><div><span>Доля побед</span><strong>{faction.share}%</strong></div><div><span>Средний RP</span><strong>{faction.averageRP??0}</strong></div></div>
         <h4>Лучшие игроки по RP</h4>

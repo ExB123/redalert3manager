@@ -203,6 +203,8 @@ function App() {
               loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={data} />
             ) : page === 'maps' && subtab === 'Статистика карт' ? (
               loading ? <p className="muted">Загрузка статистики карт…</p> : <MapStatsPanel rows={visibleData} />
+            ) : page === 'league' && subtab === 'Статистика фракций' ? (
+              loading ? <p className="muted">Загрузка статистики фракций…</p> : <FactionStatsPanel rows={visibleData} />
             ) : specialPlaceholder ? (
               <div className="empty-state">{specialPlaceholder}</div>
             ) : loading ? (
@@ -522,6 +524,41 @@ function SimulatorPanel({onComplete}) {
       {error && <div className="error"><CircleAlert size={16}/>{error}</div>}
       <div className="modal-actions"><button className="primary" type="submit" disabled={busy || !teams.length}>{busy?'Симуляция…':'Провести симуляцию'}</button></div>
     </form>
+  </div>;
+}
+
+function FactionStatsPanel({rows}) {
+  const [players,setPlayers] = useState([]);
+  useEffect(() => {
+    let active=true;
+    fetch('/api/players').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить игроков.');if(active)setPlayers(Array.isArray(body)?body:[]);})
+      .catch(()=>{if(active)setPlayers([]);});
+    return ()=>{active=false;};
+  },[]);
+  const totalWins=rows.reduce((sum,row)=>sum+Number(row.wins||0),0);
+  const totalLosses=rows.reduce((sum,row)=>sum+Number(row.losses||0),0);
+  const factions=rows.map(row=>{
+    const wins=Number(row.wins||0),losses=Number(row.losses||0),games=wins+losses;
+    return {...row,games,winRate:games?Math.round(wins/games*100):0,share:totalWins?Math.round(wins/totalWins*100):0};
+  }).sort((a,b)=>b.wins-a.wins);
+  if(!rows.length) return <div className="empty-state">Статистика фракций пока отсутствует в базе.</div>;
+  return <div className="faction-dashboard">
+    <div className="map-stat-cards">
+      <div className="map-stat-card"><span>Фракций с данными</span><strong>{rows.length}</strong></div>
+      <div className="map-stat-card"><span>Победы суммарно</span><strong>{totalWins}</strong></div>
+      <div className="map-stat-card"><span>Поражения суммарно</span><strong>{totalLosses}</strong></div>
+      <div className="map-stat-card"><span>Игроков</span><strong>{rows.reduce((sum,row)=>sum+Number(row.players||0),0)}</strong></div>
+    </div>
+    <div className="faction-comparison">{factions.map((faction,index)=>{
+      const top=players.filter(player=>player.faction===faction.faction).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,3);
+      return <section className="faction-card" key={faction.faction}><div className="faction-card-head"><div><span className="faction-index">0{index+1}</span><h3>{faction.faction}</h3></div><strong>{faction.winRate}% <small>побед</small></strong></div>
+        <div className="faction-meter"><span style={{width:faction.winRate+'%'}}/></div>
+        <div className="faction-metrics"><div><span>Победы</span><strong>{faction.wins||0}</strong></div><div><span>Поражения</span><strong>{faction.losses||0}</strong></div><div><span>Доля побед</span><strong>{faction.share}%</strong></div><div><span>Средний RP</span><strong>{faction.averageRP??0}</strong></div></div>
+        <h4>Лучшие игроки по RP</h4>
+        {top.length ? top.map((player,i)=><div className="faction-player" key={player.id}><span>{i+1}</span><strong>{player.nickname}</strong><small>{player.rpPoints??0} RP</small></div>) : <p className="muted">Игроки этой фракции не найдены.</p>}
+      </section>;
+    })}</div>
+    <p className="muted">Показатели рассчитаны по сохранённым итоговым значениям игроков. Прямое сравнение очных противостояний фракций не выводится, поскольку база не хранит фракции обоих участников в каждой исторической записи матча.</p>
   </div>;
 }
 

@@ -857,6 +857,21 @@ function ImageCell({src,alt,type='team'}) {
   </span>;
 }
 
+function configKeyLabel(key) {
+  const labels = {match_win:'Правила начисления за победу',main_player_id:'Основной игрок для рейтинговой лиги'};
+  if(labels[key]) return labels[key];
+  return String(key||'Параметр').replace(/[_-]+/g,' ').replace(/([a-zа-я])([A-ZА-Я])/g,'$1 $2').replace(/^./,char=>char.toLocaleUpperCase('ru'));
+}
+function configValueType(value) {
+  if(value===null || value===undefined || value==='') return 'Пустое';
+  const raw=String(value).trim();
+  if((raw.startsWith('{')&&raw.endsWith('}'))||(raw.startsWith('[')&&raw.endsWith(']'))) {
+    try { JSON.parse(raw); return 'JSON'; } catch {}
+  }
+  if(raw==='true'||raw==='false') return 'Логический';
+  if(Number.isFinite(Number(raw))&&raw!=='') return 'Числовой';
+  return 'Текстовый';
+}
 function emptyMessage(page, subtab) {
   if (page==='info' && subtab==='Информация') return 'Новостей пока нет — таблица News в исходной базе пустая.';
   if (page==='info' && subtab==='Медали') return 'Медалей пока нет — таблица Medal в исходной базе пустая.';
@@ -890,7 +905,7 @@ function columnsFor(page, subtab) {
     matches:[['Турнир','tournamentName'],['Команда 1','homeTeam'],['Счёт',r=>fmt(r.homeScore)+' : '+fmt(r.awayScore)],['Команда 2','awayTeam'],['Победитель','winnerName'],['Карта','map'],['Раунд','round'],['Завершён',r=>bool(r.completed)]],
     seasons:[['Сезон','name'],['Начало','startDate'],['Конец','endDate'],['Активен',r=>bool(r.isActive)]],
     maps:subtab==='Статистика карт'?[['Карта',r=>r.map||r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']]:[['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="map"/>],['Карта','name'],['Игроков','playersCount'],['Описание','description']],
-    config:[['Параметр','key'],['Значение','value'],['Описание','description']],
+    config:[['Параметр',r=>configKeyLabel(r.key)],['Тип',r=>configValueType(r.value)],['Значение','value'],['Описание','description']],
     ranks:[['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="rank"/>],['Звание','name'],['Описание','description'],['Победы для получения','requiredWins'],['Опыт для получения','requiredXP']],
     simulator:[['Дата','createdAt'],['Турнир',r=>{try{return JSON.parse(r.input).tournamentName || '—';}catch{return '—';}}],['Команды',r=>{try{const x=JSON.parse(r.input);return (x.team1 || '?')+' — '+(x.team2 || '?');}catch{return r.input;}}],['Карта',r=>{try{return JSON.parse(r.result).map || '—';}catch{return '—';}}],['Победитель',r=>{try{return JSON.parse(r.result).winner || '—';}catch{return r.result;}}]]
   };

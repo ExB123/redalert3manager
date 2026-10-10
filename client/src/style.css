@@ -12,3 +12,26 @@
 .image-rank .image-fallback{color:#f4d27a;font-size:20px}
 .rank-cell{display:inline-flex;align-items:center;gap:9px;min-height:54px}
 .team-name .image-cell{margin-right:2px}
+
+/* CRUD tools and dialogs */
+.panel-tools{display:flex;align-items:flex-start;justify-content:flex-end;gap:12px;flex-wrap:wrap}
+.panel-tools .primary,.modal-actions .primary{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.row-actions{display:flex;align-items:center;gap:6px}
+.row-actions .icon-btn{width:32px;height:32px}
+.danger-btn{color:#ff9ba3;border-color:#63303a}
+.danger-btn:hover{background:#34141c}
+.success-message{margin:14px 0;padding:12px 14px;border:1px solid #24563f;border-radius:7px;background:#0b211a;color:#a8f0c9}
+.modal-backdrop{position:fixed;inset:0;z-index:30;background:rgba(0,5,14,.78);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}
+.crud-modal{width:min(760px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#071120;border:1px solid #2a3b55;border-radius:12px;box-shadow:0 22px 80px rgba(0,0,0,.5);padding:22px}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+.modal-head h2{margin:0;font-size:21px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.form-field{display:flex;flex-direction:column;gap:7px;min-width:0;color:#a8bbd6;font-size:13px}
+.form-field input,.form-field select,.form-field textarea{width:100%;min-width:0;background:#030a17;color:#f5f7fb;border:1px solid #2a3b55;border-radius:7px;padding:10px 11px;outline:none}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:#6486b7}
+.form-field textarea{resize:vertical;min-height:80px}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.secondary{background:#111d30;color:#e5edf8;border:1px solid #2a3b55;border-radius:8px;padding:11px 16px}
+.secondary:hover{background:#192944}
+.primary:disabled{opacity:.6;cursor:wait}
+@media(max-width:760px){.panel-tools{width:100%;justify-content:stretch}.panel-tools>.primary{width:100%}.form-grid{grid-template-columns:1fr}.crud-modal{padding:16px}.modal-backdrop{padding:8px}.modal-actions{position:sticky;bottom:-16px;background:#071120;padding:12px 0 2px}}

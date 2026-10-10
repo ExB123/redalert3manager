@@ -193,3 +193,18 @@ tbody tr:hover{background:#0a1425}
 .table-wrap tbody tr.podium.p2 td:first-child{color:#e5a070;font-weight:900}
 .table-wrap tbody tr.podium:hover{filter:brightness(1.12)}
 @media(max-width:760px){.faction-name{white-space:normal}}
+
+
+/* Currency / GameConfig overview */
+.currency-summary{display:flex;flex-direction:column;gap:14px;margin:0 0 24px;padding:18px;border:1px solid #202c40;border-radius:10px;background:linear-gradient(135deg,rgba(18,35,58,.65),rgba(3,10,23,.7))}
+.currency-summary-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.currency-summary-head h3{font-size:16px;margin:0 0 7px}
+.currency-summary-head p{font-size:12px;margin:0;line-height:1.5}
+.currency-summary-head>span{font-size:11px;white-space:nowrap;color:#ffce54;border:1px solid rgba(255,206,84,.3);border-radius:20px;padding:6px 9px}
+.currency-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.currency-card{display:flex;flex-direction:column;gap:8px;min-width:0;padding:15px;border-radius:8px;border:1px solid #26364e;background:rgba(0,0,0,.18)}
+.currency-card>span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#9db2ce}
+.currency-card strong{font-size:20px;overflow-wrap:anywhere;color:#f6f8fc}
+.currency-card small{font-size:11px;color:#7f93ae;overflow-wrap:anywhere}
+.currency-empty{padding:13px 15px;border:1px dashed #3b4a61;border-radius:8px;color:#a8b8cf;font-size:12px;line-height:1.65}
+@media(max-width:900px){.currency-cards{grid-template-columns:1fr}.currency-summary-head{flex-direction:column}}

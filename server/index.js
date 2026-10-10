@@ -27,7 +27,7 @@ app.get('/api/teams', (_req, res) => {
   res.json(db.prepare(`SELECT id,name,logoUrl,wins,losses,points,level,bestMap,worstMap FROM Team ORDER BY points DESC, wins DESC, name ASC`).all());
 });
 app.get('/api/players', (_req, res) => {
-  res.json(db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.experience,p.wins,p.ratingPoints,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.rpPeak,p.position,p.bestMap,p.worstMap,p.matchWins,p.matchLosses,t.name AS teamName,r.name AS rankName,r.imageUrl AS rankImageUrl FROM Player p LEFT JOIN Team t ON t.id=p.teamId LEFT JOIN Rank r ON r.id=p.rankId ORDER BY p.rpPoints DESC, p.ratingPoints DESC, p.nickname ASC`).all());
+  res.json(db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.experience,p.wins,p.ratingPoints,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.rpPeak,p.position,p.isTeamCaptain,p.rankId,p.bestMap,p.worstMap,p.matchWins,p.matchLosses,t.name AS teamName,r.name AS rankName,r.imageUrl AS rankImageUrl FROM Player p LEFT JOIN Team t ON t.id=p.teamId LEFT JOIN Rank r ON r.id=p.rankId ORDER BY p.rpPoints DESC, p.ratingPoints DESC, p.nickname ASC`).all());
 });
 app.get('/api/faction-stats', (_req, res) => {
   res.json(db.prepare(`SELECT faction,COUNT(*) AS players,SUM(COALESCE(wins,0)) AS wins,SUM(COALESCE(ratingWins,0)) AS ratingWins,SUM(COALESCE(ratingLosses,0)) AS ratingLosses,ROUND(AVG(COALESCE(rpPoints,0)),1) AS averageRP,MAX(COALESCE(rpPeak,0)) AS peakRP FROM Player WHERE faction IS NOT NULL AND TRIM(faction) <> '' GROUP BY faction ORDER BY players DESC,faction ASC`).all());
@@ -66,13 +66,35 @@ app.get('/api/medals', (_req, res) => {
   res.json(db.prepare(`SELECT id,name,description,imageUrl,createdAt FROM Medal ORDER BY name ASC`).all());
 });
 app.get('/api/news', (_req, res) => {
-  res.json(db.prepare(`SELECT id,title,content,createdAt,relatedMatchId,relatedTournamentId FROM News ORDER BY createdAt DESC`).all());
+  res.json(db.prepare(`SELECT n.id,n.title,n.content,n.createdAt,n.relatedMatchId,n.relatedTournamentId,t.name AS relatedTournamentName,m.map AS relatedMatchMap,m.round AS relatedMatchRound,h.name AS relatedHomeTeam,a.name AS relatedAwayTeam FROM News n LEFT JOIN Tournament t ON t.id=n.relatedTournamentId LEFT JOIN Match m ON m.id=n.relatedMatchId LEFT JOIN Team h ON h.id=m.homeTeamId LEFT JOIN Team a ON a.id=m.awayTeamId ORDER BY n.createdAt DESC`).all());
 });
 app.get('/api/winner-posts', (_req, res) => {
   res.json(db.prepare(`SELECT wp.id,wp.tournamentId,wp.teamId,wp.title,wp.content,wp.createdAt,t.name AS tournamentName,tm.name AS teamName FROM WinnerPost wp LEFT JOIN Tournament t ON t.id=wp.tournamentId LEFT JOIN Team tm ON tm.id=wp.teamId ORDER BY wp.createdAt DESC`).all());
 });
 app.get('/api/achievement-showcase', (_req, res) => {
-  res.json(db.prepare(`SELECT id,name,description,imageUrl,createdAt FROM AchievementShowcase ORDER BY createdAt DESC`).all());
+  res.json(db.prepare(`SELECT s.id,s.name,s.description,s.imageUrl,s.createdAt,(SELECT group_concat(a.name, ', ') FROM _AchievementToAchievementShowcase link JOIN Achievement a ON a.id=link.A WHERE link.B=s.id) AS achievementNames FROM AchievementShowcase s ORDER BY s.createdAt DESC`).all());
+});
+app.get('/api/achievement-showcase/:id/achievements', (req, res) => {
+  const showcase = db.prepare('SELECT id FROM AchievementShowcase WHERE id=?').get(req.params.id);
+  if (!showcase) return res.status(404).json({ error: 'Витрина не найдена.' });
+  res.json(db.prepare(`SELECT a.id,a.name,a.description,a.teamId,a.playerId,a.tournamentId,CASE WHEN link.A IS NULL THEN 0 ELSE 1 END AS selected,t.name AS teamName,p.nickname AS playerName,tr.name AS tournamentName FROM Achievement a LEFT JOIN _AchievementToAchievementShowcase link ON link.A=a.id AND link.B=? LEFT JOIN Team t ON t.id=a.teamId LEFT JOIN Player p ON p.id=a.playerId LEFT JOIN Tournament tr ON tr.id=a.tournamentId ORDER BY a.name COLLATE NOCASE`).all(req.params.id));
+});
+app.put('/api/achievement-showcase/:id/achievements', (req, res) => {
+  const showcase = db.prepare('SELECT id FROM AchievementShowcase WHERE id=?').get(req.params.id);
+  if (!showcase) return res.status(404).json({ error: 'Витрина не найдена.' });
+  const ids = req.body?.achievementIds;
+  if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'Передайте список achievementIds.' });
+  const uniqueIds = [...new Set(ids)];
+  const exists = db.prepare('SELECT id FROM Achievement WHERE id=?');
+  for (const id of uniqueIds) if (!exists.get(id)) return res.status(400).json({ error: 'Одно из достижений не найдено.' });
+  try {
+    db.transaction(() => {
+      db.prepare('DELETE FROM _AchievementToAchievementShowcase WHERE B=?').run(req.params.id);
+      const add = db.prepare('INSERT INTO _AchievementToAchievementShowcase (A,B) VALUES (?,?)');
+      for (const id of uniqueIds) add.run(id, req.params.id);
+    })();
+    res.json({ ok: true, showcaseId: req.params.id, achievementIds: uniqueIds });
+  } catch (error) { res.status(400).json({ error: safeErrorMessage(error) }); }
 });
 app.get('/api/simulations', (_req, res) => {
   res.json(db.prepare(`SELECT id,createdAt,input,result FROM Simulation ORDER BY createdAt DESC LIMIT 100`).all());

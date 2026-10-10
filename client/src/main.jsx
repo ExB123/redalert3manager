@@ -180,7 +180,7 @@ function DataTable({rows,columns,empty}) {
 function columnsFor(page, subtab) {
   const map = {
     teams:[['Логотип',r=><ImageCell src={r.logoUrl} alt={r.name} type="team"/>],['Команда','name'],['Очки','points'],['Победы','wins'],['Поражения','losses'],['Уровень','level'],['Лучшая карта','bestMap'],['Худшая карта','worstMap']],
-    players:[['Игрок','nickname'],['Фракция','faction'],['Команда','teamName'],['Опыт','experience'],['Победы','wins'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Звание','rankName']],
+    players:[['Игрок','nickname'],['Фракция','faction'],['Команда','teamName'],['Опыт','experience'],['Победы','wins'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Звание',r=><span className="rank-cell"><ImageCell src={r.rankImageUrl} alt={r.rankName} type="rank"/>{fmt(r.rankName)}</span>]],
     tournaments:[['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="league"/>],['Турнир','name'],['Тип','type'],['Сезон','seasonNumber'],['Победитель','winnerName'],['Создан','createdAt']],
     matches:[['Турнир','tournamentName'],['Команда 1','homeTeam'],['Счёт',r=>fmt(r.homeScore)+' : '+fmt(r.awayScore)],['Команда 2','awayTeam'],['Карта','map'],['Раунд','round'],['Завершён',r=>bool(r.completed)]],
     seasons:[['Сезон','name'],['Начало','startDate'],['Конец','endDate'],['Активен',r=>bool(r.isActive)]],

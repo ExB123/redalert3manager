@@ -685,10 +685,17 @@ function FactionStatsPanel({rows}) {
 function MapStatsPanel({rows}) {
   const [catalogMaps,setCatalogMaps] = useState([]);
   const [matchRows,setMatchRows] = useState([]);
+  const [players,setPlayers] = useState([]);
   useEffect(() => {
     let active=true;
     fetch('/api/maps').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить каталог карт.');if(active)setCatalogMaps(Array.isArray(body)?body:[]);})
       .catch(()=>{if(active)setCatalogMaps([]);});
+    return ()=>{active=false;};
+  },[]);
+  useEffect(() => {
+    let active=true;
+    fetch('/api/players').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить игроков.');if(active)setPlayers(Array.isArray(body)?body:[]);})
+      .catch(()=>{if(active)setPlayers([]);});
     return ()=>{active=false;};
   },[]);
   useEffect(() => {
@@ -716,6 +723,16 @@ function MapStatsPanel({rows}) {
   },new Map());
   const bestWins=[...players.values()].sort((a,b)=>b.wins-a.wins || a.losses-b.losses).slice(0,5);
   const mostLosses=[...players.values()].sort((a,b)=>b.losses-a.losses || a.wins-b.wins).slice(0,5);
+  const playerFaction = new Map(players.map(player=>[player.id,player.faction]));
+  const factionStats = selectedRows.reduce((acc,row)=>{
+    const faction=playerFaction.get(row.playerId);
+    if(!faction)return acc;
+    const key=String(faction);
+    if(!acc.has(key))acc.set(key,{faction:key,wins:0,losses:0});
+    const item=acc.get(key);item.wins+=Number(row.wins||0);item.losses+=Number(row.losses||0);
+    return acc;
+  },new Map());
+  const factionRows=[...factionStats.values()].sort((a,b)=>b.wins-a.wins);
   const completedMapMatches=matchRows.filter(match=>Boolean(match.completed) && String(match.map||'')===selectedMap);
   const homeWins=completedMapMatches.filter(match=>Number(match.homeScore)>Number(match.awayScore)).length;
   const awayWins=completedMapMatches.filter(match=>Number(match.awayScore)>Number(match.homeScore)).length;
@@ -734,7 +751,11 @@ function MapStatsPanel({rows}) {
       <section className="map-stats-list"><h3>Лучшие игроки по победам</h3>{bestWins.length ? bestWins.map((player,i)=><div className="map-stat-row" key={player.name}><span className="map-stat-place">{i+1}</span><strong>{player.name}</strong><span>{player.wins} побед</span></div>) : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>
       <section className="map-stats-list"><h3>Игроки с наибольшими поражениями</h3>{mostLosses.length ? mostLosses.map((player,i)=><div className="map-stat-row" key={player.name}><span className="map-stat-place">{i+1}</span><strong>{player.name}</strong><span>{player.losses} пораж.</span></div>) : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>
     </div>
-    <p className="muted">Показатели рассчитаны по записям MapStat в базе. Эффективность фракций не выводится здесь, пока записи статистики карт не содержат надёжной привязки результата к фракции в момент матча.</p>
+    <section className="map-stats-list map-faction-efficiency">
+      <h3>Эффективность фракций на карте</h3>
+      {factionRows.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Фракция</th><th>Победы</th><th>Поражения</th><th>Винрейт</th></tr></thead><tbody>{factionRows.map(row=>{const games=row.wins+row.losses;return <tr key={row.faction}><td><FactionName value={row.faction}/></td><td>{row.wins}</td><td>{row.losses}</td><td>{games?Math.round(row.wins/games*100):0}%</td></tr>;})}</tbody></table></div> : <p className="muted">Для этой карты нет записей MapStat, привязанных к игрокам с известной фракцией.</p>}
+      <p className="muted">Фракция берётся из текущего профиля игрока; если игрок менял фракцию, исторические значения могут отличаться.</p>
+    </section>
   </div>;
 }
 

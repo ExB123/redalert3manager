@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Coins, Award, Info, Map, CalendarDays, ChartNoAxesColumn, Layers, FlaskConical, ContactRound, UsersRound, Swords, Trophy, Search, RefreshCw, House, ChevronRight, CircleAlert, Plus, Pencil, Trash2, X, Save, CheckCircle2 } from 'lucide-react';
+import { Coins, Award, Info, Map, CalendarDays, ChartNoAxesColumn, Layers, FlaskConical, ContactRound, UsersRound, Swords, Trophy, Search, Settings, RefreshCw, House, ChevronRight, CircleAlert, Plus, Pencil, Trash2, X, Save, CheckCircle2 } from 'lucide-react';
 import './style.css';
 
 const nav = [
   ['Валюта', Coins, 'config'], ['Звания', Award, 'ranks'], ['Информация', Info, 'info'], ['Карты', Map, 'maps'],
   ['Матчи', CalendarDays, 'matches'], ['Рейтинг', ChartNoAxesColumn, 'rating'], ['Рейтинговая лига', Layers, 'league'],
   ['Сезоны', CalendarDays, 'seasons'], ['Симулятор', FlaskConical, 'simulator'], ['Список игроков', ContactRound, 'players'],
-  ['Список команд', UsersRound, 'teams'], ['Ставки', Coins, 'bets'], ['Турниры', Swords, 'tournaments']
+  ['Список команд', UsersRound, 'teams'], ['Ставки', Coins, 'bets'], ['Турниры', Swords, 'tournaments'], ['Настройки', Settings, 'settings']
 ];
 const endpoints = {
   teams:'/api/teams', players:'/api/players', tournaments:'/api/tournaments', matches:'/api/matches',
@@ -61,7 +61,7 @@ function App() {
   }
 
   async function load() {
-    if (page === 'home' || page === 'bets') { setData([]); setError(''); return; }
+    if (page === 'home' || page === 'bets' || page === 'settings') { setData([]); setError(''); return; }
     setLoading(true); setError('');
     try {
       const [r, s] = await Promise.all([fetch(endpointFor()), fetch('/api/summary')]);
@@ -174,6 +174,7 @@ function App() {
           <div className="home-grid">{homeCards.map(([name,desc,id,Icon])=><article className="home-card" key={id}><h2><Icon size={22}/>{name}</h2><p>{desc}</p><button className="primary" onClick={() => goPage(id)}>Перейти</button></article>)}</div>
         </> : <>
           <h1 className="page-title">{title}</h1>
+          {page === 'settings' ? <SettingsPanel /> : null}
           {page === 'rating' && <div className="tabs rating-tabs">{ratingTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'league' && <div className="tabs">{leagueTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'maps' && <div className="tabs"><button className={subtab==='Карты'?'selected':''} onClick={()=>setSubtab('Карты')}>Карты</button><button className={subtab==='Статистика карт'?'selected':''} onClick={()=>setSubtab('Статистика карт')}>Статистика карт</button></div>}
@@ -198,7 +199,7 @@ function App() {
                 await load();
               }} />
             )}
-            {page === 'league' && subtab === 'Кабинет игрока' ? (
+            {page === 'settings' ? null : page === 'league' && subtab === 'Кабинет игрока' ? (
               loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={data} />
             ) : specialPlaceholder ? (
               <div className="empty-state">{specialPlaceholder}</div>
@@ -634,6 +635,46 @@ function compareSortValues(a,b) {
   const bd = typeof b === 'string' ? Date.parse(b) : NaN;
   if (Number.isFinite(ad) && Number.isFinite(bd)) return ad - bd;
   return String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
+}
+
+
+function SettingsPanel() {
+  const [players,setPlayers] = useState([]);
+  const [playerId,setPlayerId] = useState('');
+  const [busy,setBusy] = useState(true);
+  const [message,setMessage] = useState('');
+  const [error,setError] = useState('');
+  useEffect(() => {
+    fetch('/api/settings/main-player').then(async r => {
+      const result = await r.json();
+      if (!r.ok) throw new Error(result.error || 'Не удалось загрузить настройки.');
+      setPlayers(result.players || []);
+      setPlayerId(result.player?.id || '');
+    }).catch(e => setError(e.message)).finally(() => setBusy(false));
+  }, []);
+  async function save() {
+    setBusy(true); setMessage(''); setError('');
+    try {
+      const r = await fetch('/api/settings/main-player',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId})});
+      const result = await r.json();
+      if (!r.ok) throw new Error(result.error || 'Не удалось сохранить настройки.');
+      setMessage('Основной игрок сохранён: '+result.player.nickname);
+    } catch(e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+  return <section className="panel settings-panel">
+    <div className="panel-head"><div><h2>Основной игрок</h2><p className="muted">Для кого подбирать соперника в рейтинговой лиге.</p></div></div>
+    {busy && !players.length ? <p className="muted">Загрузка игроков…</p> : <div className="settings-form">
+      <label htmlFor="main-player-select">Игрок</label>
+      <select id="main-player-select" value={playerId} onChange={e=>setPlayerId(e.target.value)} disabled={busy}>
+        <option value="">Выберите игрока</option>{players.map(p=><option key={p.id} value={p.id}>{p.nickname}</option>)}
+      </select>
+      <button className="primary" onClick={save} disabled={busy || !playerId}>Сохранить</button>
+    </div>}
+    <p className="muted">По умолчанию используется GGanz, если он есть в базе. Выбор сохраняется в SQL-базе.</p>
+    {message && <div className="success-message">{message}</div>}
+    {error && <div className="error">{error}</div>}
+  </section>;
 }
 
 function ImageCell({src,alt,type='team'}) {

@@ -51,6 +51,8 @@ function App() {
     if (page === 'maps' && subtab === 'Статистика карт') return '/api/map-stats';
     if (page === 'info' && subtab === 'Достижения') return '/api/achievements';
     if (page === 'info' && subtab === 'Медали') return '/api/medals';
+    if (page === 'info' && subtab === 'Посты победителей') return '/api/winner-posts';
+    if (page === 'info' && subtab === 'Витрина достижений') return '/api/achievement-showcase';
     return endpoints[page];
   }
 
@@ -113,6 +115,8 @@ function App() {
   } else if (page === 'maps' && subtab === 'Статистика карт') columns = [['Карта',r=>r.map || r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']];
   else if (page === 'info' && subtab === 'Достижения') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Достижение','name'],['Описание','description'],['Игрок','playerName'],['Команда','teamName'],['Тип условия','conditionType']];
   else if (page === 'info' && subtab === 'Медали') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Медаль','name'],['Описание','description'],['Создана','createdAt']];
+  else if (page === 'info' && subtab === 'Посты победителей') columns = [['Турнир','tournamentName'],['Команда','teamName'],['Заголовок','title'],['Содержание','content'],['Создан','createdAt']];
+  else if (page === 'info' && subtab === 'Витрина достижений') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Название','name'],['Описание','description'],['Создана','createdAt']];
 
   const specialPlaceholder = page === 'bets'
     ? 'В исходной SQL-базе нет таблицы ставок. Раздел нельзя корректно включить без согласования правил и структуры данных.'
@@ -140,7 +144,7 @@ function App() {
           {page === 'rating' && <div className="tabs">{ratingTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'league' && <div className="tabs">{leagueTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'maps' && <div className="tabs"><button className={subtab==='Карты'?'selected':''} onClick={()=>setSubtab('Карты')}>Карты</button><button className={subtab==='Статистика карт'?'selected':''} onClick={()=>setSubtab('Статистика карт')}>Статистика карт</button></div>}
-          {page === 'info' && <div className="tabs">{['Информация','Достижения','Медали'].map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
+          {page === 'info' && <div className="tabs">{['Информация','Достижения','Медали','Посты победителей','Витрина достижений'].map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           <section className="panel">
             <div className="panel-head"><div><h2>{sectionTitle}</h2><p className="muted">Данные читаются из локальной SQL-базы независимой версии.</p></div>
               <div className="panel-tools">
@@ -192,6 +196,8 @@ function entityFor(page,subtab) {
   if (page==='info' && subtab==='Информация') return 'news';
   if (page==='info' && subtab==='Достижения') return 'achievements';
   if (page==='info' && subtab==='Медали') return 'medals';
+  if (page==='info' && subtab==='Посты победителей') return 'winner-posts';
+  if (page==='info' && subtab==='Витрина достижений') return 'achievement-showcase';
   if (page==='league' && subtab==='Информация о лигах') return 'leagues';
   if (page==='league' && subtab==='Рейтинговые матчи') return 'rating-matches';
   if (page==='league' && subtab==='Лучшие игроки') return 'players';
@@ -256,6 +262,14 @@ function fieldsFor(page,subtab) {
     config: [{name:'key',label:'Ключ параметра',required:true},{name:'value',label:'Значение',required:true},{name:'description',label:'Описание',type:'textarea'}],
     news: [{name:'title',label:'Заголовок',required:true},{name:'content',label:'Текст новости',type:'textarea',required:true}],
     medals: [{name:'name',label:'Название медали',required:true},{name:'description',label:'Описание',type:'textarea'},{name:'imageUrl',label:'Ссылка на изображение'}],
+    'winner-posts': [
+      {name:'tournamentId',label:'Турнир',type:'remote',endpoint:'/api/tournaments',valueKey:'id',labelKey:'name',required:true},
+      {name:'teamId',label:'Команда-победитель',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name',required:true},
+      {name:'title',label:'Заголовок поста',required:true},{name:'content',label:'Текст поста',type:'textarea',required:true}
+    ],
+    'achievement-showcase': [
+      {name:'name',label:'Название витрины',required:true},{name:'description',label:'Описание',type:'textarea'},{name:'imageUrl',label:'Ссылка на изображение'}
+    ],
     achievements: [
       {name:'name',label:'Название достижения',required:true},{name:'description',label:'Описание',type:'textarea'},
       {name:'imageUrl',label:'Ссылка на изображение'},{name:'conditionType',label:'Тип условия'},
@@ -350,6 +364,8 @@ function emptyMessage(page, subtab) {
   if (page==='info' && subtab==='Информация') return 'Новостей пока нет — таблица News в исходной базе пустая.';
   if (page==='info' && subtab==='Медали') return 'Медалей пока нет — таблица Medal в исходной базе пустая.';
   if (page==='info' && subtab==='Достижения') return 'Достижения не найдены.';
+  if (page==='info' && subtab==='Посты победителей') return 'Постов победителей пока нет.';
+  if (page==='info' && subtab==='Витрина достижений') return 'Витрина достижений пока пуста.';
   if (page==='simulator') return 'История симуляций не найдена.';
   return 'В этой таблице пока нет записей.';
 }

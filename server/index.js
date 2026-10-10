@@ -51,7 +51,7 @@ app.get('/api/maps', (_req, res) => {
   res.json(db.prepare(`SELECT id,name,imageUrl,description,playersCount,createdAt,updatedAt FROM Map ORDER BY name ASC`).all());
 });
 app.get('/api/map-stats', (_req, res) => {
-  res.json(db.prepare(`SELECT ms.id,ms.mapName,ms.wins,ms.losses,ms.createdAt,t.name AS teamName,p.nickname AS playerName,m.name AS map FROM MapStat ms LEFT JOIN Team t ON t.id=ms.teamId LEFT JOIN Player p ON p.id=ms.playerId LEFT JOIN Map m ON m.id=ms.mapId ORDER BY (ms.wins + ms.losses) DESC, ms.mapName ASC LIMIT 1000`).all());
+  res.json(db.prepare(`SELECT ms.id,ms.mapName,ms.mapId,ms.teamId,ms.playerId,ms.wins,ms.losses,ms.createdAt,t.name AS teamName,p.nickname AS playerName,m.name AS map FROM MapStat ms LEFT JOIN Team t ON t.id=ms.teamId LEFT JOIN Player p ON p.id=ms.playerId LEFT JOIN Map m ON m.id=ms.mapId ORDER BY (ms.wins + ms.losses) DESC, ms.mapName ASC LIMIT 1000`).all());
 });
 app.get('/api/config', (_req, res) => {
   res.json(db.prepare(`SELECT id,key,value,description,createdAt FROM GameConfig ORDER BY key ASC`).all());
@@ -141,6 +141,7 @@ const editableEntities = {
   'rating-matches': { table: 'RatingMatch', fields: ['player1Id','player2Id','scheduledAt','completed','winnerId','map'], required: ['player1Id','player2Id','scheduledAt'] },
   seasons: { table: 'Season', fields: ['name','startDate','endDate','isActive'], required: ['name'] },
   maps: { table: 'Map', fields: ['name','imageUrl','description','playersCount'], required: ['name'] },
+  'map-stats': { table: 'MapStat', fields: ['mapName','mapId','teamId','playerId','wins','losses'], required: ['mapName'] },
   ranks: { table: 'Rank', fields: ['name','description','imageUrl','requiredWins','requiredXP'], required: ['name'] },
   leagues: { table: 'RatingLeague', fields: ['name','description','imageUrl','requiredPoints','orderIndex'], required: ['name'] },
   config: { table: 'GameConfig', fields: ['key','value','description'], required: ['key','value'] },

@@ -158,9 +158,42 @@ function App() {
             </div>
             {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
             {actionMessage && <div className="success-message">{actionMessage}</div>}
-            {page === 'simulator' && <SimulatorPanel onComplete={async winner => { setActionMessage('Симуляция завершена. Победитель: ' + winner); await load(); }} />}
-            {page === 'league' && subtab === 'Кабинет игрока' ? (loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={visibleData}/>) : specialPlaceholder ? <div className="empty-state">{specialPlaceholder}</div> : loading ? <p className="muted">Загрузка…</p> : <DataTable rows={visibleData} columns={columns} empty={emptyMessage(page,subtab)} onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null} onDelete={crudEntity ? deleteRow : null} sortColumn={tableSort.column} sortDirection={tableSort.direction} onSort={column => setTableSort(current => ({ column, direction: current.column === column && current.direction === 'asc' ? 'desc' : 'asc' }))}/>}
-            {page === 'info' && subtab === 'Витрина достижений' && !loading && <ShowcaseLinksPanel showcases={data} onChanged={async () => { setActionMessage('Связи достижений обновлены.'); await load(); }} />
+            {page === 'simulator' && (
+              <SimulatorPanel onComplete={async winner => {
+                setActionMessage('Симуляция завершена. Победитель: ' + winner);
+                await load();
+              }} />
+            )}
+            {page === 'league' && subtab === 'Кабинет игрока' ? (
+              loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={visibleData} />
+            ) : specialPlaceholder ? (
+              <div className="empty-state">{specialPlaceholder}</div>
+            ) : loading ? (
+              <p className="muted">Загрузка…</p>
+            ) : (
+              <DataTable
+                rows={visibleData}
+                columns={columns}
+                empty={emptyMessage(page,subtab)}
+                onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null}
+                onDelete={crudEntity ? deleteRow : null}
+                sortColumn={tableSort.column}
+                sortDirection={tableSort.direction}
+                onSort={column => setTableSort(current => ({
+                  column,
+                  direction: current.column === column && current.direction === 'asc' ? 'desc' : 'asc'
+                }))}
+              />
+            )}
+            {page === 'info' && subtab === 'Витрина достижений' && !loading && (
+              <ShowcaseLinksPanel
+                showcases={data}
+                onChanged={async () => {
+                  setActionMessage('Связи достижений обновлены.');
+                  await load();
+                }}
+              />
+            )}
           </section>
         </>}
         <footer>Red Alert Tournament Manager <span>· независимая версия</span></footer>

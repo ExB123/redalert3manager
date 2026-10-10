@@ -119,7 +119,11 @@ function App() {
     }
     if (page === 'rating' && subtab !== 'Рейтинг Команд') {
       const faction = { 'Рейтинг Альянс':'Альянс', 'Рейтинг Союз':'Союз', 'Рейтинг Империя':'Империя' }[subtab];
-      if (faction) rows = rows.filter(r => String(r.faction || '').toLowerCase().includes(faction.toLowerCase()));
+      if (faction) {
+        const aliases = {'Альянс':['альянс','allied','allies'],'Союз':['союз','soviet'],'Империя':['импер','empire']};
+        const terms = aliases[faction] || [faction.toLowerCase()];
+        rows = rows.filter(r => terms.some(term=>String(r.faction||'').toLowerCase().includes(term)));
+      }
       rows.sort((a,b) => Number(b.rpPoints || b.ratingPoints || 0) - Number(a.rpPoints || a.ratingPoints || 0));
     }
     if (page === 'league' && subtab === 'Лучшие игроки') rows.sort((a,b) => Number(b.rpPoints || 0) - Number(a.rpPoints || 0));

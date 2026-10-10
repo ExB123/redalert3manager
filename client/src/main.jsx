@@ -153,7 +153,16 @@ function App() {
   </div>;
 }
 
-function ImageCell({src,alt,type='team'}) {\n  const [failed,setFailed] = useState(!src);\n  useEffect(() => { setFailed(!src); }, [src]);\n  const label = String(alt || '').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase() || (type==='rank'?'★':type==='league'?'L':'?');\n  return <span className={'image-cell image-'+type} title={alt || ''}>\n    {!failed && src ? <img src={src} alt={alt || ''} loading="lazy" onError={() => setFailed(true)}/> : <span className="image-fallback">{label}</span>}\n  </span>;\n}\n\nfunction emptyMessage(page, subtab) {
+function ImageCell({src,alt,type='team'}) {
+  const [failed,setFailed] = useState(!src);
+  useEffect(() => { setFailed(!src); }, [src]);
+  const label = String(alt || '').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase() || (type==='rank'?'★':type==='league'?'L':'?');
+  return <span className={'image-cell image-'+type} title={alt || ''}>
+    {!failed && src ? <img src={src} alt={alt || ''} loading="lazy" onError={() => setFailed(true)}/> : <span className="image-fallback">{label}</span>}
+  </span>;
+}
+
+function emptyMessage(page, subtab) {
   if (page==='info' && subtab==='Информация') return 'Новостей пока нет — таблица News в исходной базе пустая.';
   if (page==='info' && subtab==='Медали') return 'Медалей пока нет — таблица Medal в исходной базе пустая.';
   if (page==='info' && subtab==='Достижения') return 'Достижения не найдены.';

@@ -45,6 +45,7 @@ app.post('/api/matches/:id/complete', (req, res) => {
     if (match.completed) return res.status(409).json({ error: 'Этот матч уже завершён; повторное начисление статистики запрещено.' });
     if (!match.homeTeamId || !match.awayTeamId || match.homeTeamId === match.awayTeamId) return res.status(400).json({ error: 'Укажите две разные команды.' });
     if (match.homeScore === null || match.homeScore === undefined || match.awayScore === null || match.awayScore === undefined) return res.status(400).json({ error: 'Перед завершением укажите счёт обеих команд.' });
+    if (![Number(match.homeScore),Number(match.awayScore)].every(score => Number.isInteger(score) && score >= 0)) return res.status(400).json({ error: 'Счёт должен состоять из целых неотрицательных чисел.' });
     if (Number(match.homeScore) === Number(match.awayScore)) return res.status(400).json({ error: 'Ничья не поддерживается: для завершения выберите счёт с победителем.' });
     const home = db.prepare('SELECT id,name FROM Team WHERE id=?').get(match.homeTeamId);
     const away = db.prepare('SELECT id,name FROM Team WHERE id=?').get(match.awayTeamId);

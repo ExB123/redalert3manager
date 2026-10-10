@@ -231,14 +231,14 @@ function fieldsFor(page,subtab) {
       {name:'name',label:'Название турнира',required:true},{name:'type',label:'Тип турнира',type:'select',options:'type',required:true},
       {name:'description',label:'Описание',type:'textarea'},{name:'imageUrl',label:'Ссылка на изображение'},
       {name:'seasonId',label:'Сезон',type:'remote',endpoint:'/api/seasons',valueKey:'id',labelKey:'name'},
-      {name:'seasonNumber',label:'Номер сезона'},{name:'winnerName',label:'Победитель'}
+      {name:'seasonNumber',label:'Номер сезона'},{name:'winnerId',label:'Команда-победитель',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},{name:'winnerName',label:'Имя победителя / заметка'}
     ],
     matches: [
       {name:'tournamentId',label:'Турнир',type:'remote',endpoint:'/api/tournaments',valueKey:'id',labelKey:'name',required:true},
       {name:'homeTeamId',label:'Команда 1',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},
       {name:'awayTeamId',label:'Команда 2',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},
       {name:'homeScore',label:'Счёт команды 1',type:'number'},{name:'awayScore',label:'Счёт команды 2',type:'number'},
-      {name:'round',label:'Раунд',type:'number'},{name:'map',label:'Карта'},{name:'completed',label:'Матч завершён',type:'select',options:'boolean'}
+      {name:'round',label:'Раунд',type:'number'},{name:'map',label:'Карта'},{name:'winnerId',label:'Команда-победитель',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},{name:'nextMatchId',label:'Следующий матч',type:'remote',endpoint:'/api/matches',valueKey:'id',labelKey:'id'},{name:'completed',label:'Матч завершён',type:'select',options:'boolean'}
     ],
     'rating-matches': [
       {name:'player1Id',label:'Игрок 1',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname',required:true},

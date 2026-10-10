@@ -120,3 +120,5 @@ tbody tr:hover{background:#0a1425}
 .stat-card span{font-size:12px}
 .stat-card strong{font-size:22px}
 @media(max-width:760px){.content{padding:18px 12px}.panel{padding:14px}.panel h2{font-size:18px}.rating-tabs{overflow:auto;flex-wrap:nowrap}.rating-tabs button{white-space:nowrap}}
+
+.settings-panel{margin-top:16px}.settings-form{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:18px 0}.settings-form label{color:#a0a9bd;font-size:13px}.settings-form select{min-width:260px;max-width:100%;padding:10px 12px;border:1px solid #28334a;border-radius:8px;background:#0b1324;color:#f5f7fb}

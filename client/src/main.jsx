@@ -526,6 +526,17 @@ function SimulatorPanel({onComplete}) {
 function PlayerCabinet({players}) {
   const [query,setQuery] = useState('');
   const [selectedId,setSelectedId] = useState('');
+  const [ratingMatches,setRatingMatches] = useState([]);
+  const [matchesError,setMatchesError] = useState('');
+  useEffect(() => {
+    let active = true;
+    fetch('/api/rating-matches').then(async response => {
+      const rows = await response.json();
+      if (!response.ok) throw new Error(rows.error || 'Не удалось загрузить матчи игрока.');
+      if (active) setRatingMatches(Array.isArray(rows) ? rows : []);
+    }).catch(error => { if (active) setMatchesError(error.message); });
+    return () => { active = false; };
+  }, []);
   const filtered = players.filter(p => String(p.nickname || '').toLowerCase().includes(query.trim().toLowerCase()));
   const player = filtered.find(p => p.id === selectedId) || filtered[0] || null;
   useEffect(() => {
@@ -555,7 +566,21 @@ function PlayerCabinet({players}) {
         </div>
       </div>
       <div className="cabinet-details"><div><span>Лучшая карта</span><strong>{player.bestMap || '—'}</strong></div><div><span>Худшая карта</span><strong>{player.worstMap || '—'}</strong></div><div><span>Капитан команды</span><strong>{player.isTeamCaptain ? 'Да' : 'Нет'}</strong></div></div>
-      <p className="muted cabinet-note">Это просмотр профиля из локальной базы. Вход по паролю и приватная почта не включены до реализации безопасной авторизации.</p>
+      {(() => {
+        const playerMatches = ratingMatches.filter(match => match.player1Id === player.id || match.player2Id === player.id);
+        const upcoming = playerMatches.filter(match => !match.completed).sort((a,b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)));
+        const history = playerMatches.filter(match => match.completed).sort((a,b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt))).slice(0,10);
+        return <div className="cabinet-match-sections">
+          <section className="cabinet-match-card"><div className="cabinet-match-head"><h3>Предстоящие матчи</h3><span>{upcoming.length}</span></div>
+            {!upcoming.length ? <p className="muted">Предстоящих рейтинговых матчей нет.</p> : upcoming.slice(0,5).map(match => <div className="cabinet-match-row" key={match.id}><div><strong>{match.player1 || 'Игрок'} vs {match.player2 || 'Игрок'}</strong><small>{match.map || 'Карта не выбрана'}</small></div><time>{match.scheduledAt ? new Date(match.scheduledAt).toLocaleString() : 'Время не указано'}</time></div>)}
+          </section>
+          <section className="cabinet-match-card"><div className="cabinet-match-head"><h3>История матчей</h3><span>{history.length}</span></div>
+            {!history.length ? <p className="muted">Завершённых рейтинговых матчей пока нет.</p> : history.map(match => <div className="cabinet-match-row" key={match.id}><div><strong>{match.player1 || 'Игрок'} vs {match.player2 || 'Игрок'}</strong><small>{match.map || 'Карта не выбрана'}</small></div><span className={match.winnerId === player.id ? 'match-result win' : 'match-result loss'}>{match.winnerId === player.id ? 'Победа' : 'Поражение'}</span></div>)}
+          </section>
+          {matchesError && <p className="muted">{matchesError}</p>}
+        </div>;
+      })()}
+      <p className="muted cabinet-note">Профиль и матчи загружаются из локальной базы. Доступны только данные, которые уже сохранены в приложении.</p>
     </>}
   </div>;
 }

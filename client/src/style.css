@@ -72,3 +72,9 @@
 .achievement-option span{overflow-wrap:anywhere;font-size:13px}
 .achievement-option small{color:#8298b8;font-size:11px;overflow-wrap:anywhere}
 @media(max-width:760px){.cabinet-picker,.cabinet-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cabinet-details,.achievement-checklist{grid-template-columns:1fr}.cabinet-profile{padding:14px}.cabinet-identity{align-items:flex-start;gap:10px}.cabinet-identity .image-cell{flex-shrink:0}}
+
+/* Match result actions */
+.complete-btn{color:#8ee3b0;border-color:#285940}
+.complete-btn:hover{background:#0d2a1d}
+.complete-btn:disabled{opacity:.35;cursor:not-allowed}
+.locked-row{font-size:11px;color:#8ca0bd;white-space:nowrap}

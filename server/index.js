@@ -33,10 +33,10 @@ app.get('/api/faction-stats', (_req, res) => {
   res.json(db.prepare(`SELECT faction,COUNT(*) AS players,SUM(COALESCE(wins,0)) AS wins,SUM(COALESCE(ratingWins,0)) AS ratingWins,SUM(COALESCE(ratingLosses,0)) AS ratingLosses,ROUND(AVG(COALESCE(rpPoints,0)),1) AS averageRP,MAX(COALESCE(rpPeak,0)) AS peakRP FROM Player WHERE faction IS NOT NULL AND TRIM(faction) <> '' GROUP BY faction ORDER BY players DESC,faction ASC`).all());
 });
 app.get('/api/tournaments', (_req, res) => {
-  res.json(db.prepare(`SELECT id,name,description,imageUrl,type,seasonId,createdAt,seasonNumber,winnerId,winnerName FROM Tournament ORDER BY createdAt DESC`).all());
+  res.json(db.prepare(`SELECT tr.id,tr.name,tr.description,tr.imageUrl,tr.type,tr.seasonId,tr.createdAt,tr.seasonNumber,tr.winnerId,tr.winnerName,tm.name AS winnerTeamName,s.name AS seasonName FROM Tournament tr LEFT JOIN Team tm ON tm.id=tr.winnerId LEFT JOIN Season s ON s.id=tr.seasonId ORDER BY tr.createdAt DESC`).all());
 });
 app.get('/api/matches', (_req, res) => {
-  res.json(db.prepare(`SELECT m.id,m.tournamentId,m.homeTeamId,m.awayTeamId,m.homeScore,m.awayScore,m.winnerId,m.round,m.map,m.completed,m.createdAt,t.name AS tournamentName,h.name AS homeTeam,a.name AS awayTeam FROM Match m LEFT JOIN Tournament t ON t.id=m.tournamentId LEFT JOIN Team h ON h.id=m.homeTeamId LEFT JOIN Team a ON a.id=m.awayTeamId ORDER BY m.createdAt DESC LIMIT 500`).all());
+  res.json(db.prepare(`SELECT m.id,m.tournamentId,m.homeTeamId,m.awayTeamId,m.homeScore,m.awayScore,m.winnerId,m.nextMatchId,m.round,m.map,m.completed,m.createdAt,t.name AS tournamentName,h.name AS homeTeam,a.name AS awayTeam,w.name AS winnerName,COALESCE(h.name,'?') || ' — ' || COALESCE(a.name,'?') || ' · ' || COALESCE(m.map,'карта не указана') AS matchLabel FROM Match m LEFT JOIN Tournament t ON t.id=m.tournamentId LEFT JOIN Team h ON h.id=m.homeTeamId LEFT JOIN Team a ON a.id=m.awayTeamId LEFT JOIN Team w ON w.id=m.winnerId ORDER BY m.createdAt DESC LIMIT 500`).all());
 });
 app.get('/api/rating-matches', (_req, res) => {
   res.json(db.prepare(`SELECT rm.id,rm.player1Id,rm.player2Id,rm.scheduledAt,rm.completed,rm.winnerId,rm.createdAt,rm.map,p1.nickname AS player1,p2.nickname AS player2,pw.nickname AS winner FROM RatingMatch rm LEFT JOIN Player p1 ON p1.id=rm.player1Id LEFT JOIN Player p2 ON p2.id=rm.player2Id LEFT JOIN Player pw ON pw.id=rm.winnerId ORDER BY rm.scheduledAt DESC LIMIT 500`).all());

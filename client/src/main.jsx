@@ -210,7 +210,7 @@ function App() {
               }} />
             )}
             {page === 'settings' ? null : page === 'league' && subtab === 'Кабинет игрока' ? (
-              loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={data} />
+              loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={data} onFindMatch={() => runRankedAction('find-opponent')} />
             ) : page === 'league' && subtab === 'Рейтинговые матчи' ? (
               loading ? <p className="muted">Загрузка рейтинговых матчей…</p> : <RatingMatchesTable rows={visibleData} onComplete={async () => { await load(); }} />
             ) : page === 'config' ? (
@@ -764,7 +764,7 @@ function MapStatsPanel({rows}) {
   </div>;
 }
 
-function PlayerCabinet({players}) {
+function PlayerCabinet({players,onFindMatch}) {
   const [query,setQuery] = useState('');
   const [selectedId,setSelectedId] = useState('');
   const [ratingMatches,setRatingMatches] = useState([]);
@@ -787,6 +787,7 @@ function PlayerCabinet({players}) {
   const ratedGames = Number(player?.ratingWins || 0) + Number(player?.ratingLosses || 0);
   const winRate = ratedGames ? Math.round(Number(player.ratingWins || 0) / ratedGames * 100) : 0;
   return <div className="player-cabinet">
+    <div className="cabinet-find-match"><button className="primary" onClick={async()=>{await onFindMatch?.();try{const response=await fetch('/api/rating-matches');const rows=await response.json();if(response.ok)setRatingMatches(Array.isArray(rows)?rows:[]);}catch(e){setMatchesError(e.message||'Не удалось обновить историю матчей.');}}}><Search size={16}/>Найти матч</button><p className="muted">Подбор создаёт матч для основного игрока и до 20 дополнительных пар других игроков.</p></div>
     <div className="cabinet-picker">
       <label className="form-field"><span>Найти игрока</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Введите ник игрока…"/></label>
       <label className="form-field"><span>Профиль игрока</span><select value={player?.id || ''} onChange={e=>setSelectedId(e.target.value)}>{filtered.map(p=><option key={p.id} value={p.id}>{p.nickname} — {p.teamName || 'Без команды'}</option>)}</select></label>

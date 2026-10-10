@@ -152,7 +152,7 @@ function App() {
     sectionTitle = subtab;
     if (subtab === 'Информация о лигах') columns = [['#',(_,i)=>i+1],['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="league"/>],['Лига','name'],['Минимум очков','requiredPoints'],['Описание','description']];
     else if (subtab === 'Рейтинговые матчи') columns = [['Игрок 1','player1'],['Игрок 2','player2'],['Дата','scheduledAt'],['Карта','map'],['Победитель','winner'],['Завершён',r=>bool(r.completed)]];
-    else if (subtab === 'Лучшие игроки') columns = [['#',(_,i)=>i+1],['Игрок',r=><span className="player-ranking-name"><FactionName value={r.faction}/>{r.nickname}</span>],['Команда','teamName'],['RP','rpPoints'],['Рейтинговые победы','ratingWins'],['Лучшая карта',r=>r.bestMap||'—']];
+    else if (subtab === 'Лучшие игроки') columns = [['#',(_,i)=>i+1],['Игрок',r=><span className="player-ranking-name"><span className={'player-faction-dot '+(String(r.faction||'').toLowerCase().includes('союз')||String(r.faction||'').toLowerCase().includes('soviet')?'faction-red':String(r.faction||'').toLowerCase().includes('альянс')||String(r.faction||'').toLowerCase().includes('allied')?'faction-blue':'faction-yellow')}>●</span>{r.nickname}</span>],['Команда','teamName'],['RP','rpPoints'],['Рейтинговые победы','ratingWins'],['Лучшая карта',r=>r.bestMap||'—']];
     else if (subtab === 'Статистика фракций') columns = [['Фракция','faction'],['Игроков','players'],['Победы в матчах','wins'],['Поражения в матчах','losses'],['Рейтинговые победы','ratingWins'],['Рейтинговые поражения','ratingLosses'],['Средний RP','averageRP'],['Максимальный пиковый RP','peakRP']];
     else columns = [];
   } else if (page === 'maps' && subtab === 'Статистика карт') columns = [['Карта',r=>r.map || r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']];
@@ -227,7 +227,7 @@ function App() {
               <DataTable
                 rows={page === 'league' && subtab === 'Лучшие игроки' ? visibleData.slice(0,10) : visibleData}
                 columns={columns}
-                podium={page === 'rating' && subtab === 'Рейтинг Команд'}
+                podium={page === 'rating' && ['Рейтинг Команд','Рейтинг Игроков'].includes(subtab)}
                 empty={emptyMessage(page,subtab)}
                 onEdit={crudEntity ? row => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row, fields: crudFields }); } : null}
                 onDelete={crudEntity ? deleteRow : null}

@@ -736,16 +736,15 @@ function MapStatsPanel({rows}) {
   const completedMapMatches=matchRows.filter(match=>Boolean(match.completed) && String(match.map||'')===selectedMap);
   const homeWins=completedMapMatches.filter(match=>Number(match.homeScore)>Number(match.awayScore)).length;
   const awayWins=completedMapMatches.filter(match=>Number(match.awayScore)>Number(match.homeScore)).length;
-  const totalGames=completedMapMatches.length;
-  const rate=totalGames ? Math.round(homeWins/totalGames*100) : 0;
+  const totalGames=totals.wins;
   if(!mapNames.length) return <div className="empty-state">Каталог карт пуст. Добавьте карты в разделе «Карты».</div>;
   return <div className="map-stats-dashboard">
     <div className="map-stats-toolbar"><label className="form-field"><span>Выберите карту</span><select value={selectedMap} onChange={e=>setSelectedMap(e.target.value)}>{mapNames.map(name=><option key={name} value={name}>{name}</option>)}</select></label></div>
     <div className="map-stat-cards">
       <div className="map-stat-card"><span>Карта</span><strong>{selectedMap || '—'}</strong></div>
-      <div className="map-stat-card"><span>Сыграно матчей</span><strong>{totalGames}</strong></div>
-      <div className="map-stat-card"><span>Победы команды 1 / 2</span><strong>{homeWins} / {awayWins}</strong></div>
-      <div className="map-stat-card"><span>Победы команды 1</span><strong>{rate}%</strong></div>
+      <div className="map-stat-card"><span>Всего матчей</span><strong>{totalGames}</strong></div>
+      <div className="map-stat-card"><span>Победы / поражения в MapStat</span><strong>{totals.wins} / {totals.losses}</strong></div>
+      <div className="map-stat-card"><span>Игроков со статистикой</span><strong>{players.size}</strong></div>
     </div>
     <div className="map-stats-columns">
       <section className="map-stats-list"><h3>Лучшие игроки по победам</h3>{bestWins.length ? bestWins.map((player,i)=><div className="map-stat-row" key={player.name}><span className="map-stat-place">{i+1}</span><strong>{player.name}</strong><span>{player.wins} побед</span></div>) : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>

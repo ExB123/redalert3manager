@@ -508,6 +508,7 @@ function PlayerCabinet({players}) {
         <div className="cabinet-identity"><ImageCell src={player.rankImageUrl} alt={player.rankName} type="rank"/><div><h3>{player.nickname}</h3><p>{player.teamName || 'Без команды'} · {player.faction || 'Фракция не указана'}</p><span>{player.rankName || 'Звание не назначено'}{player.position ? ' · '+player.position : ''}</span></div></div>
         <div className="cabinet-stats">
           <div><span>RP</span><strong>{player.rpPoints ?? 0}</strong></div>
+          <div><span>MMR</span><strong>{player.ratingPoints ?? 0}</strong></div>
           <div><span>Пиковый RP</span><strong>{player.rpPeak ?? 0}</strong></div>
           <div><span>Опыт</span><strong>{player.experience ?? 0}</strong></div>
           <div><span>Рейтинговые игры</span><strong>{ratedGames}</strong></div>

@@ -45,7 +45,9 @@ function App() {
     if (page === 'rating') return subtab === 'Рейтинг Команд' ? '/api/teams' : '/api/players';
     if (page === 'league') {
       if (subtab === 'Рейтинговые матчи') return '/api/rating-matches';
-      if (subtab === 'Лучшие игроки' || subtab === 'Статистика фракций' || subtab === 'Кабинет игрока') return '/api/players';
+      if (subtab === 'Лучшие игроки') return '/api/players';
+      if (subtab === 'Статистика фракций') return '/api/faction-stats';
+      if (subtab === 'Кабинет игрока') return '/api/players';
       return '/api/leagues';
     }
     if (page === 'maps' && subtab === 'Статистика карт') return '/api/map-stats';
@@ -111,6 +113,7 @@ function App() {
     if (subtab === 'Информация о лигах') columns = [['#',(_,i)=>i+1],['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="league"/>],['Лига','name'],['Минимум очков','requiredPoints'],['Описание','description']];
     else if (subtab === 'Рейтинговые матчи') columns = [['Игрок 1','player1'],['Игрок 2','player2'],['Дата','scheduledAt'],['Карта','map'],['Победитель','winner'],['Завершён',r=>bool(r.completed)]];
     else if (subtab === 'Лучшие игроки') columns = [['Место',(_,i)=>i+1],['Игрок','nickname'],['Фракция','faction'],['Команда','teamName'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Победы','ratingWins'],['Поражения','ratingLosses'],['Звание',r=><span className="rank-cell"><ImageCell src={r.rankImageUrl} alt={r.rankName} type="rank"/>{fmt(r.rankName)}</span>]];
+    else if (subtab === 'Статистика фракций') columns = [['Фракция','faction'],['Игроков','players'],['Обычные победы','wins'],['Рейтинговые победы','ratingWins'],['Рейтинговые поражения','ratingLosses'],['Средний RP','averageRP'],['Максимальный пиковый RP','peakRP']];
     else columns = [];
   } else if (page === 'maps' && subtab === 'Статистика карт') columns = [['Карта',r=>r.map || r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']];
   else if (page === 'info' && subtab === 'Достижения') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Достижение','name'],['Описание','description'],['Игрок','playerName'],['Команда','teamName'],['Тип условия','conditionType']];
@@ -120,8 +123,8 @@ function App() {
 
   const specialPlaceholder = page === 'bets'
     ? 'В исходной SQL-базе нет таблицы ставок. Раздел нельзя корректно включить без согласования правил и структуры данных.'
-    : page === 'league' && (subtab === 'Кабинет игрока' || subtab === 'Статистика фракций')
-      ? (subtab === 'Кабинет игрока' ? 'Личный кабинет требует авторизации игроков. В этой версии авторизация ещё не реализована.' : 'Выберите фракцию в рейтинге, чтобы посмотреть список игроков. Сводную статистику фракций добавим отдельно.')
+    : page === 'league' && subtab === 'Кабинет игрока'
+      ? 'Личный кабинет требует авторизации игроков. В этой версии авторизация ещё не реализована.'
       : null;
   const crudEntity = entityFor(page, subtab);
   const crudFields = fieldsFor(page, subtab);

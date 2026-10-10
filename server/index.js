@@ -81,6 +81,35 @@ app.get('/api/simulations', (_req, res) => {
 
 const crypto = require('node:crypto');
 
+app.post('/api/simulations/run', (req, res) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const { team1Id, team2Id } = body;
+    if (!team1Id || !team2Id) return res.status(400).json({ error: 'Выберите обе команды.' });
+    if (team1Id === team2Id) return res.status(400).json({ error: 'Нужно выбрать две разные команды.' });
+    const prob1 = Number(body.prob1);
+    const prob2 = Number(body.prob2);
+    if (!Number.isFinite(prob1) || !Number.isFinite(prob2) || prob1 < 0 || prob2 < 0 || prob1 + prob2 <= 0) {
+      return res.status(400).json({ error: 'Вероятности должны быть числами от 0 и выше, а их сумма должна быть больше нуля.' });
+    }
+    const team1 = db.prepare('SELECT id,name FROM Team WHERE id=?').get(team1Id);
+    const team2 = db.prepare('SELECT id,name FROM Team WHERE id=?').get(team2Id);
+    if (!team1 || !team2) return res.status(400).json({ error: 'Одна из выбранных команд не найдена.' });
+    const tournament = body.tournamentId ? db.prepare('SELECT id,name FROM Tournament WHERE id=?').get(body.tournamentId) : null;
+    if (body.tournamentId && !tournament) return res.status(400).json({ error: 'Выбранный турнир не найден.' });
+    const players1 = db.prepare('SELECT nickname FROM Player WHERE teamId=? ORDER BY nickname').all(team1Id).map(x => x.nickname);
+    const players2 = db.prepare('SELECT nickname FROM Player WHERE teamId=? ORDER BY nickname').all(team2Id).map(x => x.nickname);
+    const winner = Math.random() < prob1 / (prob1 + prob2) ? team1.name : team2.name;
+    const input = { tournamentId: tournament?.id || null, tournamentName: tournament?.name || null, team1: team1.name, team2: team2.name, prob1, prob2, map: String(body.map || '') };
+    const result = { winner, prob1, prob2, map: String(body.map || ''), teams: [team1.name, team2.name], players1, players2, tournamentId: tournament?.id || null, tournamentName: tournament?.name || null };
+    const id = crypto.randomUUID().replace(/-/g, '');
+    db.prepare('INSERT INTO Simulation (id,input,result) VALUES (?,?,?)').run(id, JSON.stringify(input), JSON.stringify(result));
+    res.status(201).json({ id, createdAt: new Date().toISOString(), input, result });
+  } catch (error) {
+    res.status(400).json({ error: safeErrorMessage(error) });
+  }
+});
+
 // Explicit allowlist prevents arbitrary table/column access through API requests.
 const editableEntities = {
   teams: { table: 'Team', fields: ['name','logoUrl','wins','losses','points','level','bestMap','worstMap'], required: ['name'] },

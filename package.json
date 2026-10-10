@@ -1,0 +1,9 @@
+{
+  "name": "red-alert-tournament-manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Independent Red Alert Tournament Manager starter",
+  "scripts": {"dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"", "dev:server": "node server/index.js", "dev:client": "vite --config client/vite.config.js", "build": "vite build --config client/vite.config.js", "start": "node server/index.js"},
+  "dependencies": {"better-sqlite3": "^11.8.1", "cors": "^2.8.5", "express": "^4.21.2", "lucide-react": "^0.468.0", "react": "^18.3.1", "react-dom": "^18.3.1"},
+  "devDependencies": {"@vitejs/plugin-react": "^4.3.4", "concurrently": "^9.1.2", "vite": "^6.0.7"}
+}

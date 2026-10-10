@@ -490,6 +490,7 @@ function ShowcaseLinksPanel({showcases,onChanged}) {
 
 function sortValueForColumn(row,column,index) {
   const [label,render] = column;
+  if (label === 'Место') return row.rpPoints ?? row.points ?? row.ratingPoints ?? index;
   if (typeof render === 'string') return row[render];
   let value;
   try { value = typeof render === 'function' ? render(row,index) : undefined; } catch { value = undefined; }

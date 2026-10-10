@@ -27,7 +27,7 @@ app.get('/api/teams', (_req, res) => {
   res.json(db.prepare(`SELECT id,name,logoUrl,wins,losses,points,level,bestMap,worstMap FROM Team ORDER BY points DESC, wins DESC, name ASC`).all());
 });
 app.get('/api/players', (_req, res) => {
-  res.json(db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.experience,p.wins,p.ratingPoints,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.rpPeak,p.position,p.bestMap,p.worstMap,p.matchWins,p.matchLosses,t.name AS teamName,r.name AS rankName FROM Player p LEFT JOIN Team t ON t.id=p.teamId LEFT JOIN Rank r ON r.id=p.rankId ORDER BY p.rpPoints DESC, p.ratingPoints DESC, p.nickname ASC`).all());
+  res.json(db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.experience,p.wins,p.ratingPoints,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.rpPeak,p.position,p.bestMap,p.worstMap,p.matchWins,p.matchLosses,t.name AS teamName,r.name AS rankName,r.imageUrl AS rankImageUrl FROM Player p LEFT JOIN Team t ON t.id=p.teamId LEFT JOIN Rank r ON r.id=p.rankId ORDER BY p.rpPoints DESC, p.ratingPoints DESC, p.nickname ASC`).all());
 });
 app.get('/api/tournaments', (_req, res) => {
   res.json(db.prepare(`SELECT id,name,description,imageUrl,type,seasonId,createdAt,seasonNumber,winnerId,winnerName FROM Tournament ORDER BY createdAt DESC`).all());

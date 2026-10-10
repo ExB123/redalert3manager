@@ -412,6 +412,118 @@ function SimulatorPanel({onComplete}) {
   </div>;
 }
 
+function PlayerCabinet({players}) {
+  const [query,setQuery] = useState('');
+  const [selectedId,setSelectedId] = useState('');
+  const filtered = players.filter(p => String(p.nickname || '').toLowerCase().includes(query.trim().toLowerCase()));
+  const player = filtered.find(p => p.id === selectedId) || filtered[0] || null;
+  useEffect(() => {
+    if (!filtered.some(p => p.id === selectedId)) setSelectedId(filtered[0]?.id || '');
+  }, [players, query]);
+  if (!players.length) return <div className="empty-state">Игроки не найдены. Сначала добавьте игроков в разделе «Список игроков».</div>;
+  const ratedGames = Number(player?.ratingWins || 0) + Number(player?.ratingLosses || 0);
+  const winRate = ratedGames ? Math.round(Number(player.ratingWins || 0) / ratedGames * 100) : 0;
+  return <div className="player-cabinet">
+    <div className="cabinet-picker">
+      <label className="form-field"><span>Найти игрока</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Введите ник игрока…"/></label>
+      <label className="form-field"><span>Профиль игрока</span><select value={player?.id || ''} onChange={e=>setSelectedId(e.target.value)}>{filtered.map(p=><option key={p.id} value={p.id}>{p.nickname} — {p.teamName || 'Без команды'}</option>)}</select></label>
+    </div>
+    {!player ? <div className="empty-state">По этому запросу игроков нет.</div> : <>
+      <div className="cabinet-profile">
+        <div className="cabinet-identity"><ImageCell src={player.rankImageUrl} alt={player.rankName} type="rank"/><div><h3>{player.nickname}</h3><p>{player.teamName || 'Без команды'} · {player.faction || 'Фракция не указана'}</p><span>{player.rankName || 'Звание не назначено'}{player.position ? ' · '+player.position : ''}</span></div></div>
+        <div className="cabinet-stats">
+          <div><span>RP</span><strong>{player.rpPoints ?? 0}</strong></div>
+          <div><span>Пиковый RP</span><strong>{player.rpPeak ?? 0}</strong></div>
+          <div><span>Опыт</span><strong>{player.experience ?? 0}</strong></div>
+          <div><span>Рейтинговые игры</span><strong>{ratedGames}</strong></div>
+          <div><span>Победы</span><strong>{player.ratingWins ?? 0}</strong></div>
+          <div><span>Поражения</span><strong>{player.ratingLosses ?? 0}</strong></div>
+          <div><span>Процент побед</span><strong>{winRate}%</strong></div>
+          <div><span>Всего побед</span><strong>{player.wins ?? 0}</strong></div>
+        </div>
+      </div>
+      <div className="cabinet-details"><div><span>Лучшая карта</span><strong>{player.bestMap || '—'}</strong></div><div><span>Худшая карта</span><strong>{player.worstMap || '—'}</strong></div><div><span>Капитан команды</span><strong>{player.isTeamCaptain ? 'Да' : 'Нет'}</strong></div></div>
+      <p className="muted cabinet-note">Это просмотр профиля из локальной базы. Вход по паролю и приватная почта не включены до реализации безопасной авторизации.</p>
+    </>}
+  </div>;
+}
+
+function ShowcaseLinksPanel({showcases,onChanged}) {
+  const [showcaseId,setShowcaseId] = useState('');
+  const [achievements,setAchievements] = useState([]);
+  const [selected,setSelected] = useState([]);
+  const [busy,setBusy] = useState(false);
+  const [error,setError] = useState('');
+  useEffect(() => {
+    if (!showcases.some(s => s.id === showcaseId)) setShowcaseId(showcases[0]?.id || '');
+  }, [showcases]);
+  useEffect(() => {
+    let active = true;
+    if (!showcaseId) { setAchievements([]); setSelected([]); return () => { active = false; }; }
+    fetch('/api/achievement-showcase/'+encodeURIComponent(showcaseId)+'/achievements')
+      .then(async r => { const body=await r.json(); if(!r.ok) throw new Error(body.error || 'Не удалось загрузить связи достижений.'); return body; })
+      .then(rows => { if(active) { setAchievements(rows); setSelected(rows.filter(x=>x.selected).map(x=>x.id)); setError(''); } })
+      .catch(e => { if(active) setError(e.message); });
+    return () => { active = false; };
+  }, [showcaseId]);
+  async function save() {
+    setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/achievement-showcase/'+encodeURIComponent(showcaseId)+'/achievements',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({achievementIds:selected})});
+      const result=await response.json();
+      if(!response.ok) throw new Error(result.error || 'Не удалось сохранить связи.');
+      await onChanged();
+    } catch(e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+  return <div className="showcase-links">
+    <h3>Состав витрины достижений</h3>
+    {!showcases.length ? <p className="muted">Сначала создайте витрину выше, затем выберите достижения, которые будут в неё входить.</p> : <>
+      <label className="form-field"><span>Витрина</span><select value={showcaseId} onChange={e=>setShowcaseId(e.target.value)}>{showcases.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      <div className="achievement-checklist">{achievements.map(a=><label key={a.id} className="achievement-option"><input type="checkbox" checked={selected.includes(a.id)} onChange={e=>setSelected(old=>e.target.checked?[...old,a.id]:old.filter(id=>id!==a.id))}/><span>{a.name}</span><small>{a.teamName || a.playerName || a.tournamentName || 'Общее достижение'}</small></label>)}</div>
+      {!achievements.length && <p className="muted">Достижений пока нет. Добавьте их во вкладке «Достижения».</p>}
+      <div className="modal-actions"><button className="primary" type="button" disabled={busy} onClick={save}>{busy?'Сохранение…':'Сохранить состав витрины'}</button></div>
+    </>}
+    {error && <div className="error"><CircleAlert size={16}/>{error}</div>}
+  </div>;
+}
+
+function sortValueForColumn(row,column,index) {
+  const [label,render] = column;
+  if (typeof render === 'string') return row[render];
+  let value;
+  try { value = typeof render === 'function' ? render(row,index) : undefined; } catch { value = undefined; }
+  if (value == null || typeof value !== 'object') return value;
+  const aliases = {
+    'Логотип':['name'], 'Изображение':['name','title'], 'Эмблема':['name'],
+    'Команда':['name','teamName'], 'Игрок':['nickname','playerName'], 'Звание':['rankName'],
+    'Место':['rpPoints','points','ratingPoints'], 'Сыграно игр':['wins','losses'],
+    'Команда 1':['homeTeam'], 'Команда 2':['awayTeam'], 'Турнир':['tournamentName','name'],
+    'Победитель':['winner','winnerName'], 'Дата':['scheduledAt','createdAt'],
+    'Создан':['createdAt'], 'Создана':['createdAt'], 'Карта':['map','mapName'],
+    'Завершён':['completed'], 'Фракция':['faction'], 'Игроков':['players'],
+    'Обычные победы':['wins'], 'Рейтинговые победы':['ratingWins'],
+    'Рейтинговые поражения':['ratingLosses'], 'Средний RP':['averageRP'],
+    'Максимальный пиковый RP':['peakRP']
+  };
+  const fields = aliases[label] || [];
+  if (label === 'Сыграно игр') return Number(row.wins || 0) + Number(row.losses || 0);
+  if (label === 'Место') return row.rpPoints ?? row.points ?? row.ratingPoints ?? index;
+  for (const field of fields) if (row[field] !== undefined && row[field] !== null) return row[field];
+  return label;
+}
+function compareSortValues(a,b) {
+  if (a == null || a === '') return b == null || b === '' ? 0 : 1;
+  if (b == null || b === '') return -1;
+  const an = typeof a === 'number' ? a : (String(a).trim() !== '' ? Number(a) : NaN);
+  const bn = typeof b === 'number' ? b : (String(b).trim() !== '' ? Number(b) : NaN);
+  if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  const ad = typeof a === 'string' ? Date.parse(a) : NaN;
+  const bd = typeof b === 'string' ? Date.parse(b) : NaN;
+  if (Number.isFinite(ad) && Number.isFinite(bd)) return ad - bd;
+  return String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
+}
+
 function ImageCell({src,alt,type='team'}) {
   const [failed,setFailed] = useState(!src);
   useEffect(() => { setFailed(!src); }, [src]);
@@ -433,10 +545,18 @@ function emptyMessage(page, subtab) {
 function Toolbar({search,setSearch,sort,setSort,showSort=false}) {
   return <div className="toolbar"><div className="search"><Search size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск…"/></div>{showSort&&<select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Сортировка"><option value="points">Сортировка: по очкам</option><option value="wins">Сортировка: по победам</option><option value="level">Сортировка: по уровню</option></select>}</div>;
 }
-function DataTable({rows,columns,empty,onEdit,onDelete}) {
+function DataTable({rows,columns,empty,onEdit,onDelete,sortColumn,sortDirection,onSort}) {
+  const sortedRows = useMemo(() => {
+    if (sortColumn == null || !columns?.[sortColumn]) return rows || [];
+    const column = columns[sortColumn];
+    return [...(rows || [])].sort((a,b) => {
+      const result = compareSortValues(sortValueForColumn(a,column,0),sortValueForColumn(b,column,0));
+      return sortDirection === 'desc' ? -result : result;
+    });
+  }, [rows,columns,sortColumn,sortDirection]);
   if (!columns?.length) return <div className="empty-state">Этот экран пока не подключён.</div>;
-  if (!rows?.length) return <div className="empty-state">{empty}</div>;
-  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}>{label}</th>)}{(onEdit || onDelete) && <th>Действия</th>}</tr></thead><tbody>{rows.map((r,i)=><tr key={r.id||i}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}{(onEdit || onDelete) && <td><div className="row-actions">{onEdit && <button className="icon-btn" title="Редактировать" onClick={() => onEdit(r)}><Pencil size={15}/></button>}{onDelete && <button className="icon-btn danger-btn" title="Удалить" onClick={() => onDelete(r)}><Trash2 size={15}/></button>}</div></td>}</tr>)}</tbody></table></div>;
+  if (!sortedRows.length) return <div className="empty-state">{empty}</div>;
+  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}><button type="button" className="sortable-header" onClick={()=>onSort?.(i)} title={'Сортировать: '+label}>{label}<span aria-hidden="true">{sortColumn===i?(sortDirection==='asc'?' ↑':' ↓'):' ↕'}</span></button></th>)}{(onEdit || onDelete) && <th>Действия</th>}</tr></thead><tbody>{sortedRows.map((r,i)=><tr key={r.id||i}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}{(onEdit || onDelete) && <td><div className="row-actions">{onEdit && <button className="icon-btn" title="Редактировать" onClick={() => onEdit(r)}><Pencil size={15}/></button>}{onDelete && <button className="icon-btn danger-btn" title="Удалить" onClick={() => onDelete(r)}><Trash2 size={15}/></button>}</div></td>}</tr>)}</tbody></table></div>;
 }
 function columnsFor(page, subtab) {
   const map = {

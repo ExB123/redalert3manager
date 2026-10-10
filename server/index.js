@@ -89,7 +89,7 @@ app.post('/api/simulations/run', (req, res) => {
     if (team1Id === team2Id) return res.status(400).json({ error: 'Нужно выбрать две разные команды.' });
     const prob1 = Number(body.prob1);
     const prob2 = Number(body.prob2);
-    if (!Number.isFinite(prob1) || !Number.isFinite(prob2) || prob1 < 0 || prob2 < 0 || prob1 + prob2 <= 0) {
+    if (!Number.isFinite(prob1) || !Number.isFinite(prob2) || prob1 < 0 || prob2 < 0 || prob1 > 100 || prob2 > 100 || prob1 + prob2 <= 0) {
       return res.status(400).json({ error: 'Вероятности должны быть числами от 0 и выше, а их сумма должна быть больше нуля.' });
     }
     const team1 = db.prepare('SELECT id,name FROM Team WHERE id=?').get(team1Id);

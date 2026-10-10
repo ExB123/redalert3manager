@@ -201,6 +201,8 @@ function App() {
             )}
             {page === 'settings' ? null : page === 'league' && subtab === 'Кабинет игрока' ? (
               loading ? <p className="muted">Загрузка игроков…</p> : <PlayerCabinet players={data} />
+            ) : page === 'maps' && subtab === 'Статистика карт' ? (
+              loading ? <p className="muted">Загрузка статистики карт…</p> : <MapStatsPanel rows={visibleData} />
             ) : specialPlaceholder ? (
               <div className="empty-state">{specialPlaceholder}</div>
             ) : loading ? (
@@ -520,6 +522,44 @@ function SimulatorPanel({onComplete}) {
       {error && <div className="error"><CircleAlert size={16}/>{error}</div>}
       <div className="modal-actions"><button className="primary" type="submit" disabled={busy || !teams.length}>{busy?'Симуляция…':'Провести симуляцию'}</button></div>
     </form>
+  </div>;
+}
+
+function MapStatsPanel({rows}) {
+  const mapNames = [...new Set(rows.map(row => row.map || row.mapName).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+  const [selectedMap,setSelectedMap] = useState('');
+  useEffect(() => {
+    if (!mapNames.includes(selectedMap)) setSelectedMap(mapNames[0] || '');
+  }, [mapNames.join('|')]);
+  const selectedRows = rows.filter(row => (row.map || row.mapName) === selectedMap);
+  const totals = selectedRows.reduce((acc,row) => {
+    acc.wins += Number(row.wins || 0);
+    acc.losses += Number(row.losses || 0);
+    return acc;
+  },{wins:0,losses:0});
+  const players = selectedRows.filter(row=>row.playerName).reduce((acc,row)=>{
+    const key=row.playerId || row.playerName;
+    if(!acc.has(key)) acc.set(key,{name:row.playerName,wins:0,losses:0});
+    const item=acc.get(key); item.wins+=Number(row.wins||0); item.losses+=Number(row.losses||0);
+    return acc;
+  },new Map());
+  const bestWins=[...players.values()].sort((a,b)=>b.wins-a.wins || a.losses-b.losses).slice(0,5);
+  const mostLosses=[...players.values()].sort((a,b)=>b.losses-a.losses || a.wins-b.wins).slice(0,5);
+  const rate=totals.wins+totals.losses ? Math.round(totals.wins/(totals.wins+totals.losses)*100) : 0;
+  if(!rows.length) return <div className="empty-state">Статистика карт пока отсутствует. Она появится после фиксации результатов матчей с указанными картами.</div>;
+  return <div className="map-stats-dashboard">
+    <div className="map-stats-toolbar"><label className="form-field"><span>Выберите карту</span><select value={selectedMap} onChange={e=>setSelectedMap(e.target.value)}>{mapNames.map(name=><option key={name} value={name}>{name}</option>)}</select></label></div>
+    <div className="map-stat-cards">
+      <div className="map-stat-card"><span>Карта</span><strong>{selectedMap || '—'}</strong></div>
+      <div className="map-stat-card"><span>Победы</span><strong>{totals.wins}</strong></div>
+      <div className="map-stat-card"><span>Поражения</span><strong>{totals.losses}</strong></div>
+      <div className="map-stat-card"><span>Процент побед</span><strong>{rate}%</strong></div>
+    </div>
+    <div className="map-stats-columns">
+      <section className="map-stats-list"><h3>Лучшие игроки по победам</h3>{bestWins.length ? bestWins.map((player,i)=><div className="map-stat-row" key={player.name}><span className="map-stat-place">{i+1}</span><strong>{player.name}</strong><span>{player.wins} побед</span></div>) : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>
+      <section className="map-stats-list"><h3>Игроки с наибольшими поражениями</h3>{mostLosses.length ? mostLosses.map((player,i)=><div className="map-stat-row" key={player.name}><span className="map-stat-place">{i+1}</span><strong>{player.name}</strong><span>{player.losses} пораж.</span></div>) : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>
+    </div>
+    <p className="muted">Показатели рассчитаны по записям MapStat в базе. Эффективность фракций не выводится здесь, пока записи статистики карт не содержат надёжной привязки результата к фракции в момент матча.</p>
   </div>;
 }
 

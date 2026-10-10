@@ -197,6 +197,7 @@ function entityFor(page,subtab) {
   if (page==='matches') return 'matches';
   if (page==='seasons') return 'seasons';
   if (page==='maps' && subtab==='Карты') return 'maps';
+  if (page==='maps' && subtab==='Статистика карт') return 'map-stats';
   if (page==='ranks') return 'ranks';
   if (page==='config') return 'config';
   if (page==='info' && subtab==='Информация') return 'news';
@@ -254,6 +255,13 @@ function fieldsFor(page,subtab) {
     maps: [
       {name:'name',label:'Название карты',required:true},{name:'imageUrl',label:'Ссылка на изображение'},
       {name:'description',label:'Описание',type:'textarea'},{name:'playersCount',label:'Количество игроков',type:'number',required:true}
+    ],
+    'map-stats': [
+      {name:'mapName',label:'Название карты в статистике',required:true},
+      {name:'mapId',label:'Связанная карта',type:'remote',endpoint:'/api/maps',valueKey:'id',labelKey:'name'},
+      {name:'teamId',label:'Команда',type:'remote',endpoint:'/api/teams',valueKey:'id',labelKey:'name'},
+      {name:'playerId',label:'Игрок',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname'},
+      {name:'wins',label:'Победы',type:'number',required:true},{name:'losses',label:'Поражения',type:'number',required:true}
     ],
     ranks: [
       {name:'name',label:'Название звания',required:true},{name:'description',label:'Описание',type:'textarea'},

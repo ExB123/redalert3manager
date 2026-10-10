@@ -295,12 +295,18 @@ function CrudDialog({entity,row,fields,onClose,onSaved}) {
   async function submit(event) {
     event.preventDefault();
     setSaving(true); setError('');
-    const payload = {...values};
+    const payload = {};
+    const nullableFields = new Set(['logoUrl','bestMap','worstMap','description','imageUrl','seasonId','seasonNumber','winnerId','winnerName','homeTeamId','awayTeamId','homeScore','awayScore','map','nextMatchId','simulationLog','endDate','relatedMatchId','relatedTournamentId','teamId','playerId','tournamentId','rankId','requiredTournamentType']);
     for (const field of fields) {
-      if (field.type==='number') payload[field.name] = payload[field.name] === '' ? null : Number(payload[field.name]);
-      if (field.type==='select' && field.options==='boolean') payload[field.name] = payload[field.name] === '1';
-      if (field.type==='datetime-local' && payload[field.name]) payload[field.name] = new Date(payload[field.name]).toISOString();
-      if (payload[field.name] === '') payload[field.name] = null;
+      let value = values[field.name];
+      if (value === '' || value === undefined || value === null) {
+        if (nullableFields.has(field.name)) payload[field.name] = null;
+        continue;
+      }
+      if (field.type==='number') value = Number(value);
+      if (field.type==='select' && field.options==='boolean') value = value === '1';
+      if (field.type==='datetime-local') value = new Date(value).toISOString();
+      payload[field.name] = value;
     }
     try {
       const response = await fetch('/api/manage/'+entity+(row ? '/'+encodeURIComponent(row.id) : ''), {

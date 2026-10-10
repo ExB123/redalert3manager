@@ -498,34 +498,63 @@ function CurrencyDashboard() {
   const [error,setError] = useState('');
   const [details,setDetails] = useState(null);
   useEffect(() => {
-    let active=true;
+    let active = true;
     Promise.all([
-      fetch('/api/players').then(async r=>{const x=await r.json();if(!r.ok)throw new Error('Не удалось загрузить игроков');return x;}),
-      fetch('/api/teams').then(async r=>{const x=await r.json();if(!r.ok)throw new Error('Не удалось загрузить команды');return x;}),
-      fetch('/api/config').then(async r=>{const x=await r.json();if(!r.ok)throw new Error('Не удалось загрузить параметры экономики');return x;})
-    ]).then(([p,t,c])=>{if(active){setPlayers(Array.isArray(p)?p:[]);setTeams(Array.isArray(t)?t:[]);setConfig(Array.isArray(c)?c:[]);}})
-      .catch(e=>{if(active)setError(e.message||'Ошибка загрузки');})
-      .finally(()=>{if(active)setLoading(false);});
-    return ()=>{active=false;};
-  },[]);
-  const teamById = new Map(teams.map(team=>[team.id,team]));
-  const currencyRules = config.filter(row=>/income|cost|forecast|money|currency|econom|доход|стоим|прогноз|валют|деньг|кредит/i.test(String(row.key||'')+' '+String(row.description||'')));
-  const financeUnavailable = 'Нет подтверждённых данных';
-  const money = value => value==null || value==='' ? '—' : (Number.isFinite(Number(value)) ? new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Number(value))+' 
-  const relevant = rows.filter(row => /currency|income|cost|forecast|money|credit|econom|валют|доход|стоим|прогноз|денег|кредит/i.test(String(row.key||'')+' '+String(row.description||'')));
-  const labelFor = row => {
-    const source = String(row.description || row.key || '').trim();
-    if (/income|доход/i.test(source)) return 'Доход';
-    if (/cost|стоим|расход/i.test(source)) return 'Стоимость / расход';
-    if (/forecast|прогноз/i.test(source)) return 'Прогноз';
-    if (/currency|валют/i.test(source)) return 'Валюта';
-    if (/credit|money|денег|кредит/i.test(source)) return 'Денежный параметр';
-    return source || 'Параметр';
-  };
-  return <div className="currency-summary">
-    <div className="currency-summary-head"><div><h3>Параметры валюты и экономики</h3><p className="muted">Значения берутся из GameConfig. Здесь отображаются только параметры, реально сохранённые в базе.</p></div><span>{relevant.length} параметров</span></div>
-    {relevant.length ? <div className="currency-cards">{relevant.map(row=><article className="currency-card" key={row.id||row.key}><span>{labelFor(row)}</span><strong>{row.value}</strong><small>{row.description || row.key}</small></article>)}</div>
-      : <div className="currency-empty">В GameConfig не найдено отдельных полей дохода, стоимости или прогноза. Не подставляю вымышленные суммы: ниже доступна полная таблица параметров, где можно проверить и изменить существующие значения.</div>}
+      fetch('/api/players').then(async r => { const x = await r.json(); if (!r.ok) throw new Error('Не удалось загрузить игроков'); return x; }),
+      fetch('/api/teams').then(async r => { const x = await r.json(); if (!r.ok) throw new Error('Не удалось загрузить команды'); return x; }),
+      fetch('/api/config').then(async r => { const x = await r.json(); if (!r.ok) throw new Error('Не удалось загрузить параметры экономики'); return x; })
+    ]).then(([p,t,c]) => {
+      if (active) { setPlayers(Array.isArray(p) ? p : []); setTeams(Array.isArray(t) ? t : []); setConfig(Array.isArray(c) ? c : []); }
+    }).catch(e => { if (active) setError(e.message || 'Ошибка загрузки'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+  const teamById = new Map(teams.map(team => [team.id, team]));
+  const currencyRules = config.filter(row => /income|cost|forecast|money|currency|econom|доход|стоим|прогноз|валют|деньг|кредит/i.test(String(row.key || '') + ' ' + String(row.description || '')));
+  const unavailable = 'Нет подтверждённых данных';
+  const playerRows = [...players].sort((a,b) => Number(b.rpPoints || 0) - Number(a.rpPoints || 0));
+  const teamRows = [...teams].sort((a,b) => Number(b.points || 0) - Number(a.points || 0) || Number(b.wins || 0) - Number(a.wins || 0));
+  if (loading) return <div className="empty-state">Загрузка финансовых данных…</div>;
+  return <div className="currency-dashboard">
+    <div className="tabs currency-tabs">
+      <button className={mode === 'players' ? 'selected' : ''} onClick={() => setMode('players')}>Игроки</button>
+      <button className={mode === 'teams' ? 'selected' : ''} onClick={() => setMode('teams')}>Команды</button>
+    </div>
+    {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
+    <section className="currency-table-card">
+      <div className="currency-table-heading">
+        <div><h3>{mode === 'players' ? 'Финансовое состояние игроков' : 'Финансовое состояние команд'}</h3><p className="muted">Статистика взята из базы приложения. Денежные значения не подменяются вымышленными расчётами.</p></div>
+        <span>{mode === 'players' ? playerRows.length : teamRows.length} записей</span>
+      </div>
+      <div className="table-wrap"><table className="data-table currency-data-table">
+        <thead><tr>{(mode === 'players' ? ['Игрок','Команда','Рейт. игры','Поб/Пор','Рейтинг (win/loss)','Турниры','Итого','Стоимость игрока','Прогноз','Аналитика'] : ['Команда','Победы','Очки','Уровень','Доходы (матчи/чемпионы/доля)','Итого','Стоимость','Прогноз','Аналитика']).map(label => <th key={label}>{label}</th>)}</tr></thead>
+        <tbody>{(mode === 'players' ? playerRows : teamRows).map(row => {
+          const team = mode === 'players' ? teamById.get(row.teamId) : row;
+          const games = Number(row.ratingWins || 0) + Number(row.ratingLosses || 0);
+          return <tr key={row.id}>
+            {mode === 'players' ? <>
+              <td>{row.nickname || '—'}</td><td>{team?.name || row.teamName || '—'}</td><td>{games}</td>
+              <td>{Number(row.ratingWins || 0)}/{Number(row.ratingLosses || 0)}</td>
+              <td>{unavailable}</td><td>—</td><td>{unavailable}</td><td>{unavailable}</td><td>{unavailable}</td>
+            </> : <>
+              <td>{row.name || '—'}</td><td>{Number(row.wins || 0)}</td><td>{Number(row.points || 0)}</td><td>{Number(row.level || 0)}</td>
+              <td>{unavailable}</td><td>{unavailable}</td><td>{unavailable}</td><td>{unavailable}</td>
+            </>}
+            <td><button className="ranked-secondary currency-analytics-btn" onClick={() => setDetails({mode,row})}>Аналитика</button></td>
+          </tr>;
+        })}</tbody>
+      </table></div>
+      {!(mode === 'players' ? playerRows : teamRows).length && <div className="empty-state">Нет записей для отображения.</div>}
+    </section>
+    <section className="currency-config-card">
+      <div className="currency-table-heading"><div><h3>Параметры экономики из GameConfig</h3><p className="muted">Показываются только реальные настройки, сохранённые в базе.</p></div><span>{currencyRules.length} параметров</span></div>
+      {currencyRules.length ? <div className="currency-config-list">{currencyRules.map(row => <div key={row.id || row.key}><strong>{row.description || row.key}</strong><span>{row.value}</span></div>)}</div> : <p className="currency-missing">В базе не найдены отдельные настройки доходов, стоимости игрока/команды или прогноза. Поэтому эти суммы пока нельзя корректно рассчитать.</p>}
+    </section>
+    {details && <div className="modal-backdrop" onClick={() => setDetails(null)}><div className="modal currency-detail-modal" onClick={e => e.stopPropagation()}>
+      <div className="modal-head"><h2>Аналитика: {details.mode === 'players' ? details.row.nickname : details.row.name}</h2><button className="icon-btn" onClick={() => setDetails(null)}><X size={18}/></button></div>
+      <div className="currency-detail-grid">{Object.entries(details.row).filter(([key,value]) => !['id','createdAt','updatedAt','logoUrl','imageUrl'].includes(key) && value !== null && value !== undefined && value !== '').map(([key,value]) => <div key={key}><span>{key}</span><strong>{String(value)}</strong></div>)}</div>
+      <p className="currency-missing">Исторические доходы, стоимость и прогноз нельзя восстановить из имеющихся полей автоматически. Для точного расчёта нужны подтверждённые правила экономики.</p>
+    </div></div>}
   </div>;
 }
 

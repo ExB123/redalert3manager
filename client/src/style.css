@@ -364,3 +364,10 @@ tbody tr:hover{background:#0a1425}
 
 .map-stat-cards-compact{grid-template-columns:minmax(180px,260px);margin:12px 0 18px}
 .map-stat-cards-compact .map-stat-card{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+
+.backup-panel{margin-top:18px}
+.backup-panel .panel-head{align-items:flex-start}
+.backup-panel .panel-head .primary{white-space:nowrap}
+.backup-table td{vertical-align:middle}
+.backup-table .muted{font-size:12px}
+@media(max-width:760px){.backup-panel .panel-head{flex-direction:column}.backup-panel .panel-head .primary{width:100%;justify-content:center}}

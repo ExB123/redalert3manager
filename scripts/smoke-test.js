@@ -8,6 +8,7 @@ const db=new Database(dbPath);
 db.exec("CREATE TABLE Team(id TEXT PRIMARY KEY,name TEXT NOT NULL,logoUrl TEXT,wins INTEGER DEFAULT 0,losses INTEGER DEFAULT 0,points INTEGER DEFAULT 0,level INTEGER DEFAULT 1,bestMap TEXT,worstMap TEXT,createdAt TEXT,updatedAt TEXT);"+
 "CREATE TABLE Player(id TEXT PRIMARY KEY,nickname TEXT NOT NULL,faction TEXT,teamId TEXT,isTeamCaptain INTEGER DEFAULT 0,ratingGames INTEGER DEFAULT 0,ratingWins INTEGER DEFAULT 0,ratingLosses INTEGER DEFAULT 0,ratingPoints INTEGER DEFAULT 1000,rpPoints INTEGER DEFAULT 0,rpPeak INTEGER DEFAULT 0,experience INTEGER DEFAULT 0,wins INTEGER DEFAULT 0,position TEXT,bestMap TEXT,worstMap TEXT,matchWins INTEGER DEFAULT 0,matchLosses INTEGER DEFAULT 0,rankId TEXT);"+
 "CREATE TABLE Tournament(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT,winnerId TEXT,winnerName TEXT,seasonId TEXT,seasonNumber TEXT,createdAt TEXT,description TEXT,imageUrl TEXT);"+
+"CREATE TABLE Match(id TEXT PRIMARY KEY,tournamentId TEXT,homeTeamId TEXT,awayTeamId TEXT,homeScore INTEGER,awayScore INTEGER,winnerId TEXT,completed INTEGER DEFAULT 0,map TEXT,nextMatchId TEXT,round INTEGER,updatedAt TEXT,createdAt TEXT);"+
 "CREATE TABLE GameConfig(id TEXT PRIMARY KEY,key TEXT NOT NULL UNIQUE,value TEXT NOT NULL,description TEXT,createdAt TEXT);"+
 "CREATE TABLE Map(id TEXT PRIMARY KEY,name TEXT NOT NULL,playersCount INTEGER DEFAULT 2,imageUrl TEXT,description TEXT);"+
 "CREATE TABLE Rank(id TEXT PRIMARY KEY,name TEXT,imageUrl TEXT);"+
@@ -30,6 +31,9 @@ const tournament=db.prepare('INSERT INTO Tournament(id,name,type,winnerId,winner
 for(let i=1;i<=3;i++)tournament.run('cl'+i,i===2?'Champions League':'Champions League S'+i,'Champions League','ds','DS Esports',now);
 tournament.run('gl1','Grand League S1','Grand League','as','Astralis',now);
 tournament.run('gl2','Grand League S2','Champions League','as','Astralis',now);
+tournament.run('t-final','Champions League Test','Champions League',null,null,now);
+db.prepare('INSERT INTO Match(id,tournamentId,homeTeamId,awayTeamId,homeScore,awayScore,winnerId,completed,map,nextMatchId,round,updatedAt,createdAt) VALUES(?,?,?,?,?,?,NULL,0,?,NULL,?,?,?)')
+  .run('final-test','t-final','ds','as',3,1,'Обычное столкновение',5,now,now);
 db.prepare('INSERT INTO GameConfig(id,key,value,description,createdAt) VALUES(?,?,?,?,?)').run('match','match_win',JSON.stringify({playerPoints:5,playerMMR:50,playerMMR_Loss:-25}),'Match rules',now);
 db.prepare('INSERT INTO Map(id,name,playersCount) VALUES(?,?,?)').run('m1','Обычное столкновение',2);
 db.prepare('INSERT INTO Map(id,name,playersCount) VALUES(?,?,?)').run('m2','Промышленная мощь',2);
@@ -79,6 +83,13 @@ const simulated=await req('/api/rating-matches/simulate-upcoming',{method:'POST'
 const d3=new Database(dbPath);assert.equal(d3.prepare("SELECT completed FROM RatingMatch WHERE id='main-pending'").get().completed,0);d3.prepare("DELETE FROM RatingMatch WHERE id='main-pending'").run();d3.close();
 const found=await req('/api/rating-matches/find-opponent',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.ok(found.match.player1Id==='gg'||found.match.player2Id==='gg');assert.equal(found.createdPairs.length,20);
 ids=found.createdPairs.flatMap(m=>[m.player1Id,m.player2Id]);assert.equal(new Set(ids).size,40);assert.ok(!ids.includes('gg'));assert.ok(!ids.includes(found.match.player1Id==='gg'?found.match.player2Id:found.match.player1Id));
-console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, unique 20-match scheduling, GGanz exclusion, and matchmaking.');
+const completedFinal=await req('/api/matches/final-test/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+assert.equal(completedFinal.tournamentWinnerUpdated,true);
+const verifyTournament=new Database(dbPath);
+const finalTournament=verifyTournament.prepare("SELECT winnerId,winnerName FROM Tournament WHERE id='t-final'").get();
+assert.equal(finalTournament.winnerId,'ds');assert.equal(finalTournament.winnerName,'DS Esports');
+assert.equal(verifyTournament.prepare("SELECT completed FROM Match WHERE id='final-test'").get().completed,1);
+verifyTournament.close();
+console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction data, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
 }finally{await stop();for(const f of ['test.sqlite','test.sqlite-shm','test.sqlite-wal'])try{fs.rmSync(path.join(dir,f),{force:true});}catch{}try{fs.rmSync(dir,{recursive:true,force:true});}catch{}}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});

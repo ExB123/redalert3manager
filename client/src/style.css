@@ -359,3 +359,5 @@ tbody tr:hover{background:#0a1425}
 .ranked-match-rank{display:flex;align-items:center;gap:5px;margin:4px 0 0 16px}
 .ranked-match-rank .image-cell{width:22px;height:22px;flex-basis:22px;border-radius:50%;background:transparent;border:0}
 .ranked-match-rank small{font-size:10px;color:#8d9bb4}
+
+.cabinet-team-label{font-size:10px;color:#a0aec5}

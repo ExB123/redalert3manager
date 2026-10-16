@@ -1200,7 +1200,7 @@ function MailPanel({rows,onChanged}) {
   const unreadCount=rows.filter(row=>!row.isRead).length;
   const filtered=rows.filter(row=>{
     if(filter==='unread'&&row.isRead)return false;
-    if(filter==='read'&&!row.isRead===false)return false;
+    if(filter==='read'&&!row.isRead)return false;
     if(kind!=='all'&&row.kind!==kind)return false;
     const query=search.trim().toLowerCase();
     return !query||String(row.subject||'').toLowerCase().includes(query)||String(row.body||'').toLowerCase().includes(query)||String(row.kind||'').toLowerCase().includes(query);

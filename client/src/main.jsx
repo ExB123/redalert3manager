@@ -125,7 +125,7 @@ function App() {
         const terms = aliases[faction] || [faction.toLowerCase()];
         rows = rows.filter(r => terms.some(term=>String(r.faction||'').toLowerCase().includes(term)));
       }
-      rows.sort((a,b) => Number(b.rpPoints || b.ratingPoints || 0) - Number(a.rpPoints || a.ratingPoints || 0));
+      rows.sort((a,b) => Number(b.ratingPoints || 0) - Number(a.ratingPoints || 0));
     }
     if (page === 'league' && subtab === 'Лучшие игроки') rows.sort((a,b) => Number(b.rpPoints || 0) - Number(a.rpPoints || 0));
     if (page === 'teams') rows.sort((a,b) => Number(b[sort] || 0) - Number(a[sort] || 0));
@@ -147,7 +147,7 @@ function App() {
     columns = subtab === 'Рейтинг Команд' ? [
       ['Место',(_,i)=>i+1],['Команда',r=><span className="team-name"><ImageCell src={r.logoUrl} alt={r.name} type="team"/>{r.name}</span>],
       ['Сыграно игр',r=>(r.wins||0)+(r.losses||0)],['Очки',r=>r.points],['MMR',r=>Number(r.points||0)*2],['Победы',r=>r.wins],['Поражения',r=>r.losses],['Уровень',r=>r.level],['Аналитика',r=><button className="ranked-secondary currency-analytics-btn" onClick={()=>setTeamAnalytics(r)}>Аналитика</button>]
-    ] : [['Место',(_,i)=>i+1],['Игрок','nickname'],['Фракция',r=><FactionName value={r.faction}/>],['Команда','teamName'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Победы','ratingWins'],['Поражения','ratingLosses'],['Звание',r=><span className="rank-cell"><ImageCell src={r.rankImageUrl} alt={r.rankName} type="rank"/>{fmt(r.rankName)}</span>]];
+    ] : [['Место',(_,i)=>i+1],['Игрок',r=><span className="player-ranking-name"><span className={'player-faction-dot '+(String(r.faction||'').toLowerCase().includes('союз')||String(r.faction||'').toLowerCase().includes('soviet')?'faction-red':String(r.faction||'').toLowerCase().includes('альянс')||String(r.faction||'').toLowerCase().includes('allied')?'faction-blue':String(r.faction||'').toLowerCase().includes('импер')||String(r.faction||'').toLowerCase().includes('empire')?'faction-yellow':'faction-neutral')}>●</span>{r.nickname}</span>],['Фракция',r=><FactionName value={r.faction}/>],['Команда','teamName'],['Очки','wins'],['RP','ratingPoints'],['Победы','matchWins'],['Поражения','matchLosses']]];
   } else if (page === 'league') {
     sectionTitle = subtab;
     if (subtab === 'Информация о лигах') columns = [['#',(_,i)=>i+1],['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="league"/>],['Лига','name'],['Минимум очков','requiredPoints'],['Описание','description']];

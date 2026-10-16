@@ -17,6 +17,12 @@ db.exec(`CREATE TABLE IF NOT EXISTS PlayerFinance (
   forecastUSD INTEGER,
   updatedAt TEXT NOT NULL
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS TeamFinance (
+  teamId TEXT PRIMARY KEY REFERENCES Team(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  marketValueUSD INTEGER,
+  forecastUSD INTEGER,
+  updatedAt TEXT NOT NULL
+)`);
 const defaultCurrencyRules = [
   ['currency_player_win_reward','2000','Доход игрока за победу в рейтинговом матче, USD'],
   ['currency_captain_win_bonus','1000','Доплата капитану за победу в рейтинговом матче, USD'],
@@ -40,6 +46,22 @@ for (const [key,value,description] of defaultCurrencyRules) {
   insertCurrencyRule.run(crypto.randomUUID().replace(/-/g,''),key,value,description,new Date().toISOString());
 }
 db.prepare("UPDATE GameConfig SET value='198333.3333333333' WHERE key='currency_player_prize_champions_league' AND value='198333'").run();
+const pdfPlayerValuations = [
+  ['GGanz',6730000,8750000],['mONESY',4680000,5900000],['Magister.Yoda',4440000,4710000],
+  ['MATUBA',4680000,6270000],['KuroKy',4950000,5640000],['MinD_ContRoL',4360000,4540000]
+];
+const seedPlayerValuation = db.prepare("INSERT OR IGNORE INTO PlayerFinance (playerId,marketValueUSD,forecastUSD,updatedAt) SELECT id,?,?,? FROM Player WHERE nickname=? COLLATE NOCASE");
+for (const [nickname,marketValueUSD,forecastUSD] of pdfPlayerValuations) {
+  seedPlayerValuation.run(marketValueUSD,forecastUSD,new Date().toISOString(),nickname);
+}
+const pdfTeamValuations = [
+  ['DS Esports',19050000,20570000],['Astralis',15120000,21170000],['Fnatic',10980000,11850000],
+  ['T1 Clan',9300000,8560000],['NexGen',8580000,12020000],['ENCE',7390000,6800000],['Vitality',7150000,6570000]
+];
+const seedTeamValuation = db.prepare("INSERT OR IGNORE INTO TeamFinance (teamId,marketValueUSD,forecastUSD,updatedAt) SELECT id,?,?,? FROM Team WHERE name=? COLLATE NOCASE");
+for (const [name,marketValueUSD,forecastUSD] of pdfTeamValuations) {
+  seedTeamValuation.run(marketValueUSD,forecastUSD,new Date().toISOString(),name);
+}
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));

@@ -10,6 +10,7 @@ db.exec("CREATE TABLE Team(id TEXT PRIMARY KEY,name TEXT NOT NULL,logoUrl TEXT,w
 "CREATE TABLE Tournament(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT,winnerId TEXT,winnerName TEXT,seasonId TEXT,seasonNumber TEXT,createdAt TEXT,description TEXT,imageUrl TEXT);"+
 "CREATE TABLE GameConfig(id TEXT PRIMARY KEY,key TEXT NOT NULL UNIQUE,value TEXT NOT NULL,description TEXT,createdAt TEXT);"+
 "CREATE TABLE Map(id TEXT PRIMARY KEY,name TEXT NOT NULL,playersCount INTEGER DEFAULT 2,imageUrl TEXT,description TEXT);"+
+"CREATE TABLE Rank(id TEXT PRIMARY KEY,name TEXT,imageUrl TEXT);"+
 "CREATE TABLE MapStat(id TEXT PRIMARY KEY,mapName TEXT,mapId TEXT,wins INTEGER DEFAULT 0,losses INTEGER DEFAULT 0,teamId TEXT,playerId TEXT,createdAt TEXT);"+
 "CREATE TABLE RatingMatch(id TEXT PRIMARY KEY,player1Id TEXT NOT NULL,player2Id TEXT NOT NULL,scheduledAt TEXT NOT NULL,completed INTEGER DEFAULT 0,winnerId TEXT,createdAt TEXT,updatedAt TEXT,map TEXT);"+
 "CREATE TABLE Simulation(id TEXT PRIMARY KEY,createdAt TEXT,input TEXT NOT NULL,result TEXT NOT NULL);");
@@ -53,6 +54,10 @@ assert.equal(teamApi.find(team=>team.name==='DS Esports').bestMap,'Обычно�
 assert.equal(teamApi.find(team=>team.name==='DS Esports').worstMap,'Промышленная мощь');
 const mapStats=await req('/api/map-stats');
 assert.equal(mapStats.find(row=>row.playerName==='GGanz').teamName,'DS Esports');
+const playerApi=await req('/api/players');
+assert.equal(playerApi.find(player=>player.nickname==='GGanz').bestMap,'Обычное столкновение');
+const ratingApi=await req('/api/rating-matches');
+assert.ok(ratingApi.some(match=>match.player1Id==='gg'&&match.player2Id==='mat'&&match.player1Faction==='Союз'&&match.player2Faction==='Империя'));
 const factionStats=await req('/api/faction-stats');
 assert.equal(factionStats.reduce((sum,row)=>sum+row.wins,0),3);
 assert.equal(factionStats.reduce((sum,row)=>sum+row.losses,0),3);

@@ -618,6 +618,8 @@ function SimulatorPanel({onComplete}) {
 function RatingMatchesTable({rows,onComplete}) {
   const [busyId,setBusyId] = useState('');
   const [error,setError] = useState('');
+  const [view,setView] = useState('upcoming');
+  const [details,setDetails] = useState(null);
   async function complete(match,winnerId) {
     const winner = winnerId===match.player1Id ? match.player1 : match.player2;
     if (!window.confirm('Зафиксировать победу игрока '+winner+'? Рейтинги и статистика будут изменены.')) return;
@@ -630,17 +632,49 @@ function RatingMatchesTable({rows,onComplete}) {
     } catch(e) { setError(e.message); }
     finally { setBusyId(''); }
   }
-  if(!rows.length) return <div className="empty-state">Рейтинговых матчей пока нет. Используйте «Найти соперника» или симуляцию, чтобы создать матчи.</div>;
-  return <div className="rating-match-list">
+  const upcoming = rows.filter(match=>!match.completed).sort((a,b)=>String(a.scheduledAt||'').localeCompare(String(b.scheduledAt||'')));
+  const history = rows.filter(match=>Boolean(match.completed)).sort((a,b)=>String(b.scheduledAt||'').localeCompare(String(a.scheduledAt||'')));
+  const displayed = (view==='upcoming'?upcoming:history).slice(0,20);
+  const factionDotClass = value => {
+    const v=String(value||'').toLowerCase();
+    if(v.includes('союз')||v.includes('soviet'))return 'faction-red';
+    if(v.includes('альянс')||v.includes('allied')||v.includes('allies'))return 'faction-blue';
+    if(v.includes('импер')||v.includes('empire'))return 'faction-yellow';
+    return 'faction-neutral';
+  };
+  const formatDate = value => value ? new Date(value).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  return <div className="rating-matches-table-panel">
+    <div className="rating-match-view-tabs">
+      <button className={view==='upcoming'?'selected':''} onClick={()=>setView('upcoming')}>Ближайшие матчи <span>{upcoming.length}</span></button>
+      <button className={view==='history'?'selected':''} onClick={()=>setView('history')}>История результатов <span>{history.length}</span></button>
+    </div>
     {error && <div className="error"><CircleAlert size={16}/>{error}</div>}
-    {rows.map(match=><article className={'rating-match-card '+(match.completed?'is-completed':'')} key={match.id}>
-      <div className="rating-match-meta"><span>{match.map || 'Карта не выбрана'}</span><time>{match.scheduledAt ? new Date(match.scheduledAt).toLocaleString() : 'Дата не указана'}</time></div>
-      <div className="rating-match-versus"><div><small>Игрок 1</small><strong>{match.player1 || 'Неизвестен'}</strong></div><span>VS</span><div><small>Игрок 2</small><strong>{match.player2 || 'Неизвестен'}</strong></div></div>
-      <div className="rating-match-footer">{match.completed
-        ? <span className="match-result win">Завершён · Победитель: {match.winner || 'не указан'}</span>
-        : <><span className="muted">Матч ожидает результата</span><div className="rating-match-actions"><button type="button" className="ranked-secondary" disabled={Boolean(busyId)} onClick={()=>complete(match,match.player1Id)}>{busyId===match.id?'Сохранение…':'Победа '+(match.player1||'игрока 1')}</button><button type="button" className="ranked-secondary" disabled={Boolean(busyId)} onClick={()=>complete(match,match.player2Id)}>{busyId===match.id?'Сохранение…':'Победа '+(match.player2||'игрока 2')}</button></div></>}
+    {!displayed.length ? <div className="empty-state">{view==='upcoming'?'Предстоящих рейтинговых матчей нет. Используйте «Найти соперника» или «Провести 20 матчей».':'Завершённых рейтинговых матчей пока нет.'}</div> :
+      <div className="table-wrap"><table className="data-table ranked-matches-data-table">
+        <thead><tr><th>Время</th><th>Игрок 1</th><th>Игрок 2</th><th>Карта</th><th>Статус</th><th>Действия</th></tr></thead>
+        <tbody>{displayed.map(match=><tr key={match.id}>
+          <td className="ranked-match-date">{formatDate(match.scheduledAt)}</td>
+          <td><div className="ranked-match-player"><span className={'player-faction-dot '+factionDotClass(match.player1Faction)}>●</span><strong>{match.player1||'Неизвестен'}</strong></div><small className="ranked-match-team">{match.player1Team||'Без команды'}</small></td>
+          <td><div className="ranked-match-player"><span className={'player-faction-dot '+factionDotClass(match.player2Faction)}>●</span><strong>{match.player2||'Неизвестен'}</strong></div><small className="ranked-match-team">{match.player2Team||'Без команды'}</small></td>
+          <td>{match.map||'—'}</td>
+          <td><span className={match.completed?'match-status-completed':'match-status-pending'}>{match.completed?'Завершён':'Ожидается'}</span>{match.completed&&match.winner?<small className="ranked-match-winner">Победил {match.winner}</small>:null}</td>
+          <td><div className="ranked-match-row-actions">
+            <button type="button" className="ranked-secondary" onClick={()=>setDetails(match)}>Подробнее</button>
+            {!match.completed&&<><button type="button" className="ranked-secondary" disabled={Boolean(busyId)} onClick={()=>complete(match,match.player1Id)}>{busyId===match.id?'Сохранение…':'Победил '+(match.player1||'игрок 1')}</button><button type="button" className="ranked-secondary" disabled={Boolean(busyId)} onClick={()=>complete(match,match.player2Id)}>{busyId===match.id?'Сохранение…':'Победил '+(match.player2||'игрок 2')}</button></>}
+          </div></td>
+        </tr>)}</tbody>
+      </table></div>}
+    {(view==='upcoming'?upcoming:history).length>20&&<p className="muted ranked-match-count-note">Показаны первые 20 из {(view==='upcoming'?upcoming:history).length} матчей.</p>}
+    {details&&<div className="modal-backdrop" onClick={()=>setDetails(null)}><section className="crud-modal ranked-match-details" onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Подробности рейтингового матча">
+      <div className="modal-head"><h2>Рейтинговый матч</h2><button type="button" className="icon-btn" onClick={()=>setDetails(null)}><X size={17}/></button></div>
+      <div className="ranked-match-detail-versus">
+        <div><span className={'player-faction-dot '+factionDotClass(details.player1Faction)}>●</span><h3>{details.player1||'Неизвестен'}</h3><p>{details.player1Team||'Без команды'}</p><span>RP: {details.player1RP??0} · MMR: {details.player1MMR??0}</span><p><FactionName value={details.player1Faction}/></p></div>
+        <strong className="ranked-match-vs">VS</strong>
+        <div><span className={'player-faction-dot '+factionDotClass(details.player2Faction)}>●</span><h3>{details.player2||'Неизвестен'}</h3><p>{details.player2Team||'Без команды'}</p><span>RP: {details.player2RP??0} · MMR: {details.player2MMR??0}</span><p><FactionName value={details.player2Faction}/></p></div>
       </div>
-    </article>)}
+      <div className="currency-detail-grid"><div><span>Дата и время</span><strong>{formatDate(details.scheduledAt)}</strong></div><div><span>Карта</span><strong>{details.map||'—'}</strong></div><div><span>Статус</span><strong>{details.completed?'Завершён':'Ожидается'}</strong></div><div><span>Победитель</span><strong>{details.winner||'Не определён'}</strong></div></div>
+      {!details.completed&&<div className="modal-actions"><button className="primary" onClick={async()=>{await complete(details,details.player1Id);setDetails(null);}}>Победа {details.player1}</button><button className="primary" onClick={async()=>{await complete(details,details.player2Id);setDetails(null);}}>Победа {details.player2}</button></div>}
+    </section></div>}
   </div>;
 }
 

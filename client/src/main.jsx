@@ -591,6 +591,7 @@ function CurrencyDashboard() {
   return <div className="currency-dashboard">
     <div className="tabs currency-tabs"><button className={mode==='players'?'selected':''} onClick={()=>setMode('players')}>Игроки</button><button className={mode==='teams'?'selected':''} onClick={()=>setMode('teams')}>Команды</button></div>
     {error&&<div className="error"><CircleAlert size={18}/>{error}</div>}
+    {message&&!details&&!editingRules&&<div className="success-message">{message}</div>}
     <section className="currency-table-card">
       <div className="currency-table-heading"><div><h3>{mode==='players'?'Финансовое состояние игроков':'Финансовое состояние команд'}</h3><p className="muted">Доходы пересчитываются из результатов рейтинговых матчей и побед в турнирах. Стоимость и прогноз сохраняются отдельно.</p></div><span>{mode==='players'?playerRows.length:teamRows.length} записей</span></div>
       <div className="table-wrap"><table className="data-table currency-data-table">

@@ -910,7 +910,7 @@ function MapStatsPanel({rows}) {
     return acc;
   },new Map());
   const bestWins=[...players.values()].sort((a,b)=>b.wins-a.wins || a.losses-b.losses).slice(0,3);
-  const mostLosses=[...players.values()].sort((a,b)=>b.losses-a.losses || a.wins-b.wins).slice(0,5);
+  const mostLosses=[...players.values()].sort((a,b)=>b.losses-a.losses || a.wins-b.wins || a.name.localeCompare(b.name,'ru')).slice(0,3);
   const playerFaction = new Map(rosterPlayers.map(player=>[player.id,player.faction]));
   const factionStats = selectedRows.reduce((acc,row)=>{
     const faction=playerFaction.get(row.playerId);
@@ -928,18 +928,12 @@ function MapStatsPanel({rows}) {
     return 99;
   };
   const factionRows=[...factionStats.values()].sort((a,b)=>factionDisplayOrder(a.faction)-factionDisplayOrder(b.faction));
-  const completedMapMatches=matchRows.filter(match=>Boolean(match.completed) && String(match.map||'')===selectedMap);
-  const homeWins=completedMapMatches.filter(match=>Number(match.homeScore)>Number(match.awayScore)).length;
-  const awayWins=completedMapMatches.filter(match=>Number(match.awayScore)>Number(match.homeScore)).length;
   const totalGames=totals.wins;
   if(!mapNames.length) return <div className="empty-state">Каталог карт пуст. Добавьте карты в разделе «Карты».</div>;
   return <div className="map-stats-dashboard">
     <div className="map-stats-toolbar"><label className="form-field"><span>Выберите карту</span><select value={selectedMap} onChange={e=>setSelectedMap(e.target.value)}>{mapNames.map(name=><option key={name} value={name}>{name}</option>)}</select></label></div>
-    <div className="map-stat-cards">
-      <div className="map-stat-card"><span>Карта</span><strong>{selectedMap || '—'}</strong></div>
+    <div className="map-stat-cards map-stat-cards-compact">
       <div className="map-stat-card"><span>Всего матчей</span><strong>{totalGames}</strong></div>
-      <div className="map-stat-card"><span>Победы / поражения в MapStat</span><strong>{totals.wins} / {totals.losses}</strong></div>
-      <div className="map-stat-card"><span>Игроков со статистикой</span><strong>{players.size}</strong></div>
     </div>
     <div className="map-stats-columns">
       <section className="map-stats-list"><h3>Топ-3 победителей</h3>{bestWins.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Игрок</th><th>Команда</th><th>Побед</th></tr></thead><tbody>{bestWins.map(player=><tr key={player.name}><td>{player.name}</td><td>{player.team}</td><td>{player.wins}</td></tr>)}</tbody></table></div> : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>

@@ -120,13 +120,13 @@ function App() {
     }
     if (page === 'rating' && subtab !== 'Рейтинг Команд') {
       const faction = { 'Рейтинг Альянс':'Альянс', 'Рейтинг Союз':'Союз', 'Рейтинг Империя':'Империя' }[subtab];
-      if (faction) {
-        const aliases = {'Альянс':['альянс','allied','allies'],'Союз':['союз','soviet'],'Империя':['импер','empire']};
-        const terms = aliases[faction] || [faction.toLowerCase()];
-        rows = rows.filter(r => terms.some(term=>String(r.faction||'').toLowerCase().includes(term)));
-      }
+      const aliases = {'Альянс':['альянс','allied','allies'],'Союз':['союз','soviet'],'Империя':['импер','empire']};
+      const terms = faction ? (aliases[faction] || [faction.toLowerCase()]) : null;
+      if (terms) rows = rows.filter(r => terms.some(term=>String(r.faction||'').toLowerCase().includes(term)));
+      const rankRows = data.filter(r=>!terms||terms.some(term=>String(r.faction||'').toLowerCase().includes(term)))
+        .sort((a,b)=>Number(b.ratingPoints||0)-Number(a.ratingPoints||0));
+      const playerRanks = new Map(rankRows.map((row,index)=>[row.id,index]));
       rows.sort((a,b) => Number(b.ratingPoints || 0) - Number(a.ratingPoints || 0));
-      const playerRanks = new Map([...rows].map((row,index)=>[row.id,index]));
       rows = rows.map(row=>({...row,_podiumRank:playerRanks.get(row.id) ?? 999}));
     }
     if (page === 'league' && subtab === 'Лучшие игроки') rows.sort((a,b) => Number(b.rpPoints || 0) - Number(a.rpPoints || 0));

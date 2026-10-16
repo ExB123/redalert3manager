@@ -289,11 +289,14 @@ app.post('/api/rating-matches/find-opponent', (_req,res) => {
         .run(id,pair.first.id,pair.second.id,scheduledAt,nowIso,nowIso,map);
       const createdPairs = [];
       const usedPairs = new Set([[pair.first.id,pair.second.id].sort().join(':')]);
+      const pairedIds = new Set([mainPlayer.id,opponent.id]);
       const otherPlayers = players.filter(player => player.id !== mainPlayer.id && player.id !== opponent.id && !busy.has(player.id));
       for (let index=0; index<20; index++) {
-        const nextPair = chooseRankedPair(otherPlayers,usedPairs);
+        const nextPair = chooseRankedPair(otherPlayers,usedPairs,pairedIds);
         if (!nextPair) break;
         usedPairs.add(nextPair.key);
+        pairedIds.add(nextPair.first.id);
+        pairedIds.add(nextPair.second.id);
         const pairTime = new Date(now.getTime()+(index+2)*10*60*1000).toISOString();
         const pairId = crypto.randomUUID().replace(/-/g,'');
         const pairMap = maps.length ? maps[Math.floor(Math.random()*maps.length)] : null;
@@ -329,45 +332,51 @@ app.post('/api/rating-matches/:id/complete', (req,res) => {
 app.post('/api/rating-matches/simulate-20', (_req,res) => {
   try {
     const result = db.transaction(() => {
-      const rules = rankedRules();
       const maps = rankedMaps();
       const allPlayers = allRankedPlayers();
       const configuredMainId = db.prepare("SELECT value FROM GameConfig WHERE key='main_player_id'").get()?.value;
       const mainPlayer = (configuredMainId && allPlayers.find(player=>player.id===configuredMainId))
         || allPlayers.find(player=>String(player.nickname||'').toLowerCase()==='gganz');
-      // Bulk run intentionally excludes the configured main player (GGanz by default).
-      const playersById = new Map(allPlayers.filter(player=>!mainPlayer || player.id!==mainPlayer.id).map(player=>[player.id,player]));
-      if (playersById.size < 2) throw new Error('Для симуляции нужны минимум два игрока помимо основного игрока.');
+      const eligiblePlayers = allPlayers.filter(player=>!mainPlayer || player.id!==mainPlayer.id);
+      if (eligiblePlayers.length < 40) throw new Error('Для создания 20 пар без повторения игроков нужно минимум 40 игроков помимо основного.');
       const created = [];
       const usedPairs = new Set();
+      const pairedIds = new Set();
+      const now = new Date();
       for (let i=0;i<20;i++) {
-        const players = [...playersById.values()].sort((a,b)=>a.ratingGames-b.ratingGames);
-        const pair = chooseRankedPair(players,usedPairs);
-        if (!pair) throw new Error('Не удалось подобрать игроков для всех 20 матчей.');
+        const pair = chooseRankedPair(eligiblePlayers,usedPairs,pairedIds);
+        if (!pair) throw new Error('Не удалось подобрать 20 уникальных пар без повторения игроков.');
         usedPairs.add(pair.key);
-        const now = new Date(Date.now()+i);
-        const nowIso = now.toISOString();
+        pairedIds.add(pair.first.id);
+        pairedIds.add(pair.second.id);
+        const scheduledAt = new Date(now.getTime()+(i+1)*10*60*1000).toISOString();
+        const createdAt = now.toISOString();
         const map = maps.length ? maps[Math.floor(Math.random()*maps.length)] : null;
         const id = crypto.randomUUID().replace(/-/g,'');
         db.prepare('INSERT INTO RatingMatch (id,player1Id,player2Id,scheduledAt,completed,winnerId,createdAt,updatedAt,map) VALUES (?,?,?,?,0,NULL,?,?,?)')
-          .run(id,pair.first.id,pair.second.id,nowIso,nowIso,nowIso,map);
-        const played = simulateRankedMatch({id,player1Id:pair.first.id,player2Id:pair.second.id,map},playersById,rules,nowIso);
-        created.push(played);
+          .run(id,pair.first.id,pair.second.id,scheduledAt,createdAt,createdAt,map);
+        created.push({id,player1Id:pair.first.id,player2Id:pair.second.id,player1:pair.first.nickname,player2:pair.second.nickname,scheduledAt,completed:0,winnerId:null,map});
       }
+      const payload = {count:created.length,matches:created,excludedMainPlayer:mainPlayer?.nickname || null,resultsGenerated:false};
       db.prepare('INSERT INTO Simulation (id,createdAt,input,result) VALUES (?,?,?,?)')
-        .run(crypto.randomUUID().replace(/-/g,''),new Date().toISOString(),JSON.stringify({type:'rating-batch',count:20,excludedMainPlayer:mainPlayer?.nickname || null}),JSON.stringify({count:created.length,matches:created}));
-      return {ok:true,count:created.length,matches:created};
+        .run(crypto.randomUUID().replace(/-/g,''),now.toISOString(),JSON.stringify({type:'rating-batch-scheduled',count:created.length,excludedMainPlayer:mainPlayer?.nickname || null}),JSON.stringify(payload));
+      return {ok:true,...payload,message:'Создано 20 предстоящих рейтинговых матчей без участия основного игрока. Для проведения используйте «Симулировать ближайшие матчи».'};
     })();
     res.json(result);
-  } catch(error) { res.status(400).json({error:error.message || 'Не удалось провести 20 рейтинговых матчей.'}); }
+  } catch(error) { res.status(400).json({error:error.message || 'Не удалось создать 20 рейтинговых матчей.'}); }
 });
 app.post('/api/rating-matches/simulate-upcoming', (_req,res) => {
   try {
     const result = db.transaction(() => {
       const rules = rankedRules();
-      const pending = db.prepare('SELECT id,player1Id,player2Id,scheduledAt,map FROM RatingMatch WHERE completed=0 ORDER BY scheduledAt ASC,createdAt ASC LIMIT 20').all();
-      if (!pending.length) return {ok:true,count:0,matches:[],message:'Нет незавершённых рейтинговых матчей для симуляции.'};
-      const playersById = new Map(allRankedPlayers().map(player=>[player.id,player]));
+      const allPlayers = allRankedPlayers();
+      const configuredMainId = db.prepare("SELECT value FROM GameConfig WHERE key='main_player_id'").get()?.value;
+      const mainPlayer = (configuredMainId && allPlayers.find(player=>player.id===configuredMainId))
+        || allPlayers.find(player=>String(player.nickname||'').toLowerCase()==='gganz');
+      const pending = db.prepare('SELECT id,player1Id,player2Id,scheduledAt,map FROM RatingMatch WHERE completed=0 AND player1Id<>? AND player2Id<>? ORDER BY scheduledAt ASC,createdAt ASC LIMIT 20')
+        .all(mainPlayer?.id || '',mainPlayer?.id || '');
+      if (!pending.length) return {ok:true,count:0,matches:[],message:'Нет незавершённых рейтинговых матчей без участия основного игрока для симуляции.'};
+      const playersById = new Map(allPlayers.map(player=>[player.id,player]));
       const played = pending.map(match=>simulateRankedMatch(match,playersById,rules,new Date().toISOString()));
       db.prepare('INSERT INTO Simulation (id,createdAt,input,result) VALUES (?,?,?,?)')
         .run(crypto.randomUUID().replace(/-/g,''),new Date().toISOString(),JSON.stringify({type:'rating-upcoming',count:pending.length}),JSON.stringify({count:played.length,matches:played}));

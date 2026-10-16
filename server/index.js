@@ -232,6 +232,23 @@ app.get('/api/currency', (_req,res) => {
     res.json({players:playerRows,teams:teamRows,rules:{playerWinReward,captainBonus,teamWinReward,teamSharePercent},configRows});
   } catch(error) { res.status(500).json({error:safeErrorMessage(error)}); }
 });
+app.put('/api/currency/rules', (req,res) => {
+  try {
+    const values=req.body?.rules;
+    if(!values||typeof values!=='object'||Array.isArray(values))return res.status(400).json({error:'Передайте объект правил расчёта.'});
+    const update=db.transaction(()=>{
+      const statement=db.prepare("UPDATE GameConfig SET value=? WHERE key=? AND key LIKE 'currency_%'");
+      for(const [key,raw] of Object.entries(values)){
+        const value=Number(raw);
+        if(!key.startsWith('currency_')||!Number.isFinite(value)||value<0)throw new Error('Правило '+key+' должно быть неотрицательным числом.');
+        const result=statement.run(String(value),key);
+        if(!result.changes)throw new Error('Правило '+key+' не найдено.');
+      }
+      return db.prepare("SELECT id,key,value,description FROM GameConfig WHERE key LIKE 'currency_%' ORDER BY key ASC").all();
+    });
+    res.json({ok:true,rules:update()});
+  } catch(error) { res.status(400).json({error:safeErrorMessage(error)}); }
+});
 app.put('/api/currency/players/:id', (req,res) => {
   try {
     const player=db.prepare('SELECT id FROM Player WHERE id=?').get(req.params.id);

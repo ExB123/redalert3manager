@@ -312,3 +312,15 @@ tbody tr:hover{background:#0a1425}
 .currency-valuation-form{border-top:1px solid #27354d;padding-top:14px;margin-top:18px}
 @media(max-width:900px){.currency-rules-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.currency-rule-editor-list,.currency-rules-grid{grid-template-columns:1fr}}
+
+.faction-overview-section,.faction-winrate-section{margin-bottom:18px}
+.faction-overview-section>h3,.faction-winrate-section>h3{margin:0 0 12px;font-size:16px}
+.faction-winrate-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.faction-winrate-card{min-width:0;padding:16px;background:#070b1b;border:1px solid #1b2740;border-radius:8px;display:flex;flex-direction:column;gap:10px}
+.faction-winrate-label{font-size:12px;color:#9aa9c0}
+.faction-winrate-card .faction-meter{height:9px;background:#26334a;border-radius:8px;overflow:hidden}
+.faction-winrate-card .faction-meter span{display:block;height:100%;background:#19d18b;border-radius:8px}
+.faction-winrate-values{display:flex;justify-content:space-between;gap:10px;font-size:11px}
+.faction-winrate-values span:first-child{color:#45d99a}
+.faction-winrate-values span:last-child{color:#ff646c}
+@media(max-width:900px){.faction-winrate-grid{grid-template-columns:1fr}}

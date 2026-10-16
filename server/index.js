@@ -137,7 +137,15 @@ app.post('/api/matches/:id/complete', (req, res) => {
 });
 
 app.get('/api/rating-matches', (_req, res) => {
-  res.json(db.prepare(`SELECT rm.id,rm.player1Id,rm.player2Id,rm.scheduledAt,rm.completed,rm.winnerId,rm.createdAt,rm.map,p1.nickname AS player1,p2.nickname AS player2,pw.nickname AS winner FROM RatingMatch rm LEFT JOIN Player p1 ON p1.id=rm.player1Id LEFT JOIN Player p2 ON p2.id=rm.player2Id LEFT JOIN Player pw ON pw.id=rm.winnerId ORDER BY rm.scheduledAt DESC`).all());
+  res.json(db.prepare(`SELECT rm.id,rm.player1Id,rm.player2Id,rm.scheduledAt,rm.completed,rm.winnerId,rm.createdAt,rm.map,
+    p1.nickname AS player1,p1.faction AS player1Faction,p1.rpPoints AS player1RP,p1.ratingPoints AS player1MMR,
+    t1.name AS player1Team,r1.name AS player1Rank,r1.imageUrl AS player1RankImageUrl,
+    p2.nickname AS player2,p2.faction AS player2Faction,p2.rpPoints AS player2RP,p2.ratingPoints AS player2MMR,
+    t2.name AS player2Team,r2.name AS player2Rank,r2.imageUrl AS player2RankImageUrl,pw.nickname AS winner
+    FROM RatingMatch rm
+    LEFT JOIN Player p1 ON p1.id=rm.player1Id LEFT JOIN Team t1 ON t1.id=p1.teamId LEFT JOIN Rank r1 ON r1.id=p1.rankId
+    LEFT JOIN Player p2 ON p2.id=rm.player2Id LEFT JOIN Team t2 ON t2.id=p2.teamId LEFT JOIN Rank r2 ON r2.id=p2.rankId
+    LEFT JOIN Player pw ON pw.id=rm.winnerId ORDER BY rm.scheduledAt DESC,rm.createdAt DESC`).all());
 });
 app.get('/api/leagues', (_req, res) => {
   res.json(db.prepare(`SELECT id,name,description,imageUrl,requiredPoints,orderIndex,createdAt,updatedAt FROM RatingLeague ORDER BY orderIndex ASC`).all());

@@ -16,7 +16,7 @@ db.exec("CREATE TABLE Team(id TEXT PRIMARY KEY,name TEXT NOT NULL,logoUrl TEXT,w
 "CREATE TABLE RatingMatch(id TEXT PRIMARY KEY,player1Id TEXT NOT NULL,player2Id TEXT NOT NULL,scheduledAt TEXT NOT NULL,completed INTEGER DEFAULT 0,winnerId TEXT,createdAt TEXT,updatedAt TEXT,map TEXT);"+
 "CREATE TABLE Simulation(id TEXT PRIMARY KEY,createdAt TEXT,input TEXT NOT NULL,result TEXT NOT NULL);");
 const team=db.prepare('INSERT INTO Team(id,name,wins,losses,points,level,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?,?)');
-team.run('ds','DS Esports',22,4,170,2,now,now);team.run('as','Astralis',21,5,162,2,now,now);team.run('other','Other Team',10,5,50,1,now,now);
+team.run('ds','DS Esports',22,4,170,2,now,now);team.run('as','Astralis',21,5,162,2,now,now);team.run('other','Other Team',10,5,50,1,now,now);team.run('fnatic','Fnatic',13,6,105,2,now,now);
 const player=db.prepare('INSERT INTO Player(id,nickname,faction,teamId,isTeamCaptain,ratingGames,ratingWins,ratingLosses,ratingPoints,rpPoints,rpPeak,experience) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
 for(const p of [
 ['gg','GGanz','Союз','ds',1,71,43,28,1200,875,900,30000],
@@ -34,7 +34,13 @@ tournament.run('gl2','Grand League S2','Champions League','as','Astralis',now);
 tournament.run('t-final','Champions League Test','Champions League',null,null,now);
 db.prepare('INSERT INTO Match(id,tournamentId,homeTeamId,awayTeamId,homeScore,awayScore,winnerId,completed,map,nextMatchId,round,updatedAt,createdAt) VALUES(?,?,?,?,?,?,NULL,0,?,NULL,?,?,?)')
   .run('final-test','t-final','ds','as',3,1,'Обычное столкновение',5,now,now);
-db.prepare('INSERT INTO GameConfig(id,key,value,description,createdAt) VALUES(?,?,?,?,?)').run('match','match_win',JSON.stringify({playerPoints:5,playerMMR:50,playerMMR_Loss:-25}),'Match rules',now);
+db.prepare('INSERT INTO Match(id,tournamentId,homeTeamId,awayTeamId,homeScore,awayScore,winnerId,completed,map,nextMatchId,round,updatedAt,createdAt) VALUES(?,?,?,?,?,?,?,1,?,NULL,?,?,?)')
+  .run('third-test','t-final','fnatic','other',2,1,'fnatic','Обычное столкновение',4,now,now);
+const addConfig=db.prepare('INSERT INTO GameConfig(id,key,value,description,createdAt) VALUES(?,?,?,?,?)');
+addConfig.run('match','match_win',JSON.stringify({teamPoints:10,playerPoints:5,playerMMR:50,playerMMR_Loss:-25}),'Match rules',now);
+addConfig.run('cl-first','champions_league_1_place',JSON.stringify({teamPoints:10,teamMMR:400,playerPoints:10,playerMMR:100}),'First place',now);
+addConfig.run('cl-second','champions_league_2_place',JSON.stringify({teamPoints:9,teamMMR:400,playerPoints:10,playerMMR:100}),'Second place',now);
+addConfig.run('cl-third','champions_league_3_place',JSON.stringify({teamPoints:8,teamMMR:400,playerPoints:10,playerMMR:100}),'Third place',now);
 db.prepare('INSERT INTO Map(id,name,playersCount) VALUES(?,?,?)').run('m1','Обычное столкновение',2);
 db.prepare('INSERT INTO Map(id,name,playersCount) VALUES(?,?,?)').run('m2','Промышленная мощь',2);
 const addMapStat=db.prepare('INSERT INTO MapStat(id,mapName,mapId,wins,losses,teamId,playerId,createdAt) VALUES(?,?,?,?,?,?,?,?)');
@@ -89,6 +95,12 @@ const found=await req('/api/rating-matches/find-opponent',{method:'POST',headers
 ids=found.createdPairs.flatMap(m=>[m.player1Id,m.player2Id]);assert.equal(new Set(ids).size,40);assert.ok(!ids.includes('gg'));assert.ok(!ids.includes(found.match.player1Id==='gg'?found.match.player2Id:found.match.player1Id));
 const completedFinal=await req('/api/matches/final-test/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
 assert.equal(completedFinal.tournamentWinnerUpdated,true);
+assert.equal(completedFinal.tournamentAwards.length,3);
+assert.deepEqual(completedFinal.tournamentAwards.map(award=>award.place),[1,2,3]);
+const afterTournamentTeams=await req('/api/teams');
+assert.equal(afterTournamentTeams.find(team=>team.name==='DS Esports').teamMMR,740);
+assert.equal(afterTournamentTeams.find(team=>team.name==='Astralis').teamMMR,724);
+assert.equal(afterTournamentTeams.find(team=>team.name==='Fnatic').teamMMR,610);
 const verifyTournament=new Database(dbPath);
 const finalTournament=verifyTournament.prepare("SELECT winnerId,winnerName FROM Tournament WHERE id='t-final'").get();
 assert.equal(finalTournament.winnerId,'ds');assert.equal(finalTournament.winnerName,'DS Esports');

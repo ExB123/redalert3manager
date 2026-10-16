@@ -121,7 +121,7 @@ app.get('/api/matches', (_req, res) => {
 });
 app.post('/api/matches/:id/complete', (req, res) => {
   try {
-    const match = db.prepare('SELECT id,tournamentId,homeTeamId,awayTeamId,homeScore,awayScore,winnerId,completed,map,nextMatchId FROM Match WHERE id=?').get(req.params.id);
+    const match = db.prepare('SELECT id,tournamentId,homeTeamId,awayTeamId,homeScore,awayScore,winnerId,completed,map,nextMatchId,round FROM Match WHERE id=?').get(req.params.id);
     if (!match) return res.status(404).json({ error: 'Матч не найден.' });
     if (match.completed) return res.status(409).json({ error: 'Этот матч уже завершён; повторное начисление статистики запрещено.' });
     if (!match.homeTeamId || !match.awayTeamId || match.homeTeamId === match.awayTeamId) return res.status(400).json({ error: 'Укажите две разные команды.' });
@@ -183,7 +183,15 @@ app.post('/api/matches/:id/complete', (req, res) => {
           }
         }
       }
-      return { winner:winner.name, loser:loser.name, nextMatchAdvanced:advanced, winningPlayers:winningPlayers.length, losingPlayers:losingPlayers.length };
+      let tournamentWinnerUpdated = false;
+      if (match.tournamentId && !match.nextMatchId) {
+        const finalRound = db.prepare('SELECT MAX(round) AS maxRound FROM Match WHERE tournamentId=?').get(match.tournamentId)?.maxRound;
+        if (finalRound!==null && finalRound!==undefined && Number(match.round)===Number(finalRound)) {
+          const updated = db.prepare('UPDATE Tournament SET winnerId=?,winnerName=? WHERE id=?').run(winner.id,winner.name,match.tournamentId);
+          tournamentWinnerUpdated = updated.changes>0;
+        }
+      }
+      return { winner:winner.name, loser:loser.name, nextMatchAdvanced:advanced, tournamentWinnerUpdated, winningPlayers:winningPlayers.length, losingPlayers:losingPlayers.length };
     })();
     res.json({ ok:true, matchId:match.id, ...result });
   } catch (error) {

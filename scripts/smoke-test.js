@@ -10,6 +10,7 @@ db.exec("CREATE TABLE Team(id TEXT PRIMARY KEY,name TEXT NOT NULL,logoUrl TEXT,w
 "CREATE TABLE Tournament(id TEXT PRIMARY KEY,name TEXT NOT NULL,type TEXT,winnerId TEXT,winnerName TEXT,seasonId TEXT,seasonNumber TEXT,createdAt TEXT,description TEXT,imageUrl TEXT);"+
 "CREATE TABLE GameConfig(id TEXT PRIMARY KEY,key TEXT NOT NULL UNIQUE,value TEXT NOT NULL,description TEXT,createdAt TEXT);"+
 "CREATE TABLE Map(id TEXT PRIMARY KEY,name TEXT NOT NULL,playersCount INTEGER DEFAULT 2,imageUrl TEXT,description TEXT);"+
+"CREATE TABLE MapStat(id TEXT PRIMARY KEY,mapName TEXT,mapId TEXT,wins INTEGER DEFAULT 0,losses INTEGER DEFAULT 0,teamId TEXT,playerId TEXT,createdAt TEXT);"+
 "CREATE TABLE RatingMatch(id TEXT PRIMARY KEY,player1Id TEXT NOT NULL,player2Id TEXT NOT NULL,scheduledAt TEXT NOT NULL,completed INTEGER DEFAULT 0,winnerId TEXT,createdAt TEXT,updatedAt TEXT,map TEXT);"+
 "CREATE TABLE Simulation(id TEXT PRIMARY KEY,createdAt TEXT,input TEXT NOT NULL,result TEXT NOT NULL);");
 const team=db.prepare('INSERT INTO Team(id,name,wins,losses,points,level,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?,?)');
@@ -30,6 +31,11 @@ tournament.run('gl1','Grand League S1','Grand League','as','Astralis',now);
 tournament.run('gl2','Grand League S2','Champions League','as','Astralis',now);
 db.prepare('INSERT INTO GameConfig(id,key,value,description,createdAt) VALUES(?,?,?,?,?)').run('match','match_win',JSON.stringify({playerPoints:5,playerMMR:50,playerMMR_Loss:-25}),'Match rules',now);
 db.prepare('INSERT INTO Map(id,name,playersCount) VALUES(?,?,?)').run('m1','Обычное столкновение',2);
+db.prepare('INSERT INTO Map(id,name,playersCount) VALUES(?,?,?)').run('m2','Промышленная мощь',2);
+const addMapStat=db.prepare('INSERT INTO MapStat(id,mapName,mapId,wins,losses,teamId,playerId,createdAt) VALUES(?,?,?,?,?,?,?,?)');
+addMapStat.run('ms-gg','Обычное столкновение','m1',5,2,null,'gg',now);
+addMapStat.run('ms-mo','Обычное столкновение','m1',4,3,null,'mo',now);
+addMapStat.run('ms-ma','Промышленная мощь','m2',1,6,null,'ma',now);
 const addCompletedMatch=db.prepare('INSERT INTO RatingMatch(id,player1Id,player2Id,scheduledAt,completed,winnerId,createdAt,updatedAt,map) VALUES(?,?,?,?,1,?,?,?,?)');
 addCompletedMatch.run('faction-match-1','gg','mat',now,'gg',now,now,'Обычное столкновение');
 addCompletedMatch.run('faction-match-2','mo','ma',now,'ma',now,now,'Обычное столкновение');
@@ -42,6 +48,11 @@ async function wait(){for(let i=0;i<60;i++){if(child.exitCode!==null)throw Error
 async function stop(){if(child.exitCode===null){child.kill('SIGTERM');await Promise.race([new Promise(r=>child.once('exit',r)),new Promise(r=>setTimeout(r,1500))]);if(child.exitCode===null)child.kill('SIGKILL');}}
 async function main(){try{
 await wait();
+const teamApi=await req('/api/teams');
+assert.equal(teamApi.find(team=>team.name==='DS Esports').bestMap,'Обычное столкновение');
+assert.equal(teamApi.find(team=>team.name==='DS Esports').worstMap,'Промышленная мощь');
+const mapStats=await req('/api/map-stats');
+assert.equal(mapStats.find(row=>row.playerName==='GGanz').teamName,'DS Esports');
 const factionStats=await req('/api/faction-stats');
 assert.equal(factionStats.reduce((sum,row)=>sum+row.wins,0),3);
 assert.equal(factionStats.reduce((sum,row)=>sum+row.losses,0),3);

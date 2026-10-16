@@ -150,7 +150,7 @@ function App() {
     sectionTitle = subtab;
     columns = subtab === 'Рейтинг Команд' ? [
       ['Место',r=>(r._podiumRank??0)+1],['Команда',r=><span className="team-name"><ImageCell src={r.logoUrl} alt={r.name} type="team"/>{r.name}</span>],
-      ['Сыграно игр',r=>(r.wins||0)+(r.losses||0)],['Очки',r=>r.points],['MMR',r=>Number(r.points||0)*2],['Победы',r=>r.wins],['Поражения',r=>r.losses],['Уровень',r=>r.level],['Аналитика',r=><button className="ranked-secondary currency-analytics-btn" onClick={()=>setTeamAnalytics(r)}>Аналитика</button>]
+      ['Сыграно игр',r=>(r.wins||0)+(r.losses||0)],['Очки',r=>r.points],['MMR',r=>Number(r.points||0)*2],['Победы',r=>r.wins],['Поражения',r=>r.losses],['Уровень',r=>r.rankingLevel??r.level],['Аналитика',r=><button className="ranked-secondary currency-analytics-btn" onClick={()=>setTeamAnalytics(r)}>Аналитика</button>]
      ] : [['Место',r=>(r._podiumRank??0)+1],['Игрок',r=><span className="player-ranking-name"><span className={'player-faction-dot '+(String(r.faction||'').toLowerCase().includes('союз')||String(r.faction||'').toLowerCase().includes('soviet')?'faction-red':String(r.faction||'').toLowerCase().includes('альянс')||String(r.faction||'').toLowerCase().includes('allied')?'faction-blue':String(r.faction||'').toLowerCase().includes('импер')||String(r.faction||'').toLowerCase().includes('empire')?'faction-yellow':'faction-neutral')}>●</span>{r.nickname}</span>],['Фракция',r=><FactionName value={r.faction}/>],['Команда','teamName'],['Очки','wins'],['RP','ratingPoints'],['Победы','matchWins'],['Поражения','matchLosses']];
   } else if (page === 'league') {
     sectionTitle = subtab;
@@ -262,7 +262,7 @@ function App() {
     </main>
     {teamAnalytics && <div className="modal-backdrop" onClick={() => setTeamAnalytics(null)}><div className="modal currency-detail-modal" onClick={e => e.stopPropagation()}>
       <div className="modal-head"><h2>Аналитика команды: {teamAnalytics.name}</h2><button className="icon-btn" onClick={() => setTeamAnalytics(null)}><X size={18}/></button></div>
-      <div className="currency-detail-grid">{[['Сыграно игр',Number(teamAnalytics.wins||0)+Number(teamAnalytics.losses||0)],['Очки',teamAnalytics.points||0],['MMR',Number(teamAnalytics.points||0)*2],['Победы',teamAnalytics.wins||0],['Поражения',teamAnalytics.losses||0],['Уровень',teamAnalytics.level||0],['Лучшая карта',teamAnalytics.bestMap||'—'],['Худшая карта',teamAnalytics.worstMap||'—']].map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
+      <div className="currency-detail-grid">{[['Сыграно игр',Number(teamAnalytics.wins||0)+Number(teamAnalytics.losses||0)],['Очки',teamAnalytics.points||0],['MMR',Number(teamAnalytics.points||0)*2],['Победы',teamAnalytics.wins||0],['Поражения',teamAnalytics.losses||0],['Уровень',teamAnalytics.rankingLevel??teamAnalytics.level??0],['Лучшая карта',teamAnalytics.bestMap||'—'],['Худшая карта',teamAnalytics.worstMap||'—']].map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
       <p className="muted">MMR отображается по формуле из предоставленного образца: очки команды × 2.</p>
     </div></div>}
     {crudDialog && <CrudDialog entity={crudDialog.entity} row={crudDialog.row} fields={crudDialog.fields} onClose={() => setCrudDialog(null)} onSaved={async message => { setCrudDialog(null); setActionMessage(message); await load(); }}/>}

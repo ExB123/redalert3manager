@@ -42,9 +42,9 @@ let c=await req('/api/currency');let gg=c.players.find(p=>p.nickname==='GGanz'),
 assert.equal(gg.matchIncome,129000);assert.ok(Math.abs(gg.tournamentIncome-595000)<1);assert.ok(Math.abs(gg.totalIncome-724000)<1);
 assert.equal(ds.matchIncome,330000);assert.equal(ds.tournamentIncome,7500000);assert.equal(ds.shareIncome,402000);assert.equal(ds.totalIncome,8232000);
 assert.equal(as.matchIncome,315000);assert.equal(as.tournamentIncome,3300000);assert.equal(as.shareIncome,257000);assert.equal(as.totalIncome,3872000);
-assert.equal(gg.marketValueUSD,null);
+assert.equal(gg.marketValueUSD,6730000);assert.equal(gg.forecastUSD,8750000);assert.equal(ds.marketValueUSD,19050000);assert.equal(ds.forecastUSD,20570000);assert.equal(as.marketValueUSD,15120000);assert.equal(as.forecastUSD,21170000);
 for(const [id,marketValueUSD,forecastUSD] of [['gg',6730000,8750000],['mo',4680000,5900000],['ma',4440000,4710000]])await req('/api/currency/players/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({marketValueUSD,forecastUSD})});
-c=await req('/api/currency');ds=c.teams.find(t=>t.name==='DS Esports');assert.equal(ds.marketValueUSD,15850000);assert.equal(ds.forecastUSD,19360000);
+c=await req('/api/currency');ds=c.teams.find(t=>t.name==='DS Esports');assert.equal(ds.marketValueUSD,19050000);assert.equal(ds.forecastUSD,20570000);await req('/api/currency/teams/ds',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({marketValueUSD:19100000,forecastUSD:20600000})});c=await req('/api/currency');ds=c.teams.find(t=>t.name==='DS Esports');assert.equal(ds.marketValueUSD,19100000);assert.equal(ds.forecastUSD,20600000);
 const saved=await req('/api/currency/rules',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({rules:{currency_player_win_reward:'2100'}})});assert.ok(saved.rules.some(x=>x.key==='currency_player_win_reward'&&Number(x.value)===2100));
 const batch=await req('/api/rating-matches/simulate-20',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(batch.count,20);assert.equal(batch.resultsGenerated,false);
 let ids=batch.matches.flatMap(m=>[m.player1Id,m.player2Id]);assert.equal(new Set(ids).size,40);assert.ok(!ids.includes('gg'));assert.ok(batch.matches.every(m=>m.completed===0&&!m.winnerId));

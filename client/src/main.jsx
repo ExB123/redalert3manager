@@ -501,7 +501,7 @@ function CrudDialog({entity,row,fields,onClose,onSaved}) {
 function CurrencyDashboard() {
   const [mode,setMode] = useState('players');
   const [playerSort,setPlayerSort] = useState({key:'totalIncome',direction:'desc'});
-  const [teamSort,setTeamSort] = useState({key:'totalIncome',direction:'desc'});
+  const [teamSort,setTeamSort] = useState({key:'marketValueUSD',direction:'desc'});
   const [players,setPlayers] = useState([]);
   const [teams,setTeams] = useState([]);
   const [rules,setRules] = useState({});

@@ -562,7 +562,7 @@ function CurrencyDashboard() {
       const endpoint=details.kind==='players'?'/api/currency/players/':'/api/currency/teams/';
       const response=await fetch(endpoint+encodeURIComponent(details.row.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({marketValueUSD:marketValue===''?null:Number(marketValue),forecastUSD:forecast===''?null:Number(forecast)})});
       const body=await response.json();
-      if(!response.ok)throw new Error(body.error||'Не удалось сохранить оценку игрока.');
+      if(!response.ok)throw new Error(body.error||'Не удалось сохранить стоимость и прогноз.');
       await loadCurrency();
       setDetails(current=>current?{...current,row:{...current.row,marketValueUSD:body.marketValueUSD,forecastUSD:body.forecastUSD}}:null);
       setMessage('Стоимость и прогноз сохранены.');

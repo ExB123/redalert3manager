@@ -79,8 +79,12 @@ const saved=await req('/api/currency/rules',{method:'PUT',headers:{'Content-Type
 const batch=await req('/api/rating-matches/simulate-20',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(batch.count,20);assert.equal(batch.resultsGenerated,false);
 let ids=batch.matches.flatMap(m=>[m.player1Id,m.player2Id]);assert.equal(new Set(ids).size,40);assert.ok(!ids.includes('gg'));assert.ok(batch.matches.every(m=>m.completed===0&&!m.winnerId));
 const d2=new Database(dbPath);d2.prepare('INSERT INTO RatingMatch(id,player1Id,player2Id,scheduledAt,completed,createdAt,updatedAt,map) VALUES(?,?,?,?,0,?,?,?)').run('main-pending','gg','o0',new Date(Date.now()+1000).toISOString(),now,now,'Обычное столкновение');d2.close();
+const beforeDb=new Database(dbPath);const beforeMapTotals=beforeDb.prepare('SELECT COALESCE(SUM(wins),0) AS wins,COALESCE(SUM(losses),0) AS losses FROM MapStat').get();beforeDb.close();
 const simulated=await req('/api/rating-matches/simulate-upcoming',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(simulated.count,20);
-const d3=new Database(dbPath);assert.equal(d3.prepare("SELECT completed FROM RatingMatch WHERE id='main-pending'").get().completed,0);d3.prepare("DELETE FROM RatingMatch WHERE id='main-pending'").run();d3.close();
+const afterDb=new Database(dbPath);const afterMapTotals=afterDb.prepare('SELECT COALESCE(SUM(wins),0) AS wins,COALESCE(SUM(losses),0) AS losses FROM MapStat').get();assert.equal(afterMapTotals.wins,beforeMapTotals.wins+20);assert.equal(afterMapTotals.losses,beforeMapTotals.losses+20);assert.equal(afterDb.prepare("SELECT completed FROM RatingMatch WHERE id='main-pending'").get().completed,0);afterDb.prepare("DELETE FROM RatingMatch WHERE id='main-pending'").run();afterDb.close();
+const editCompleted=await fetch(url+'/api/manage/rating-matches/faction-match-1',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({scheduledAt:now})});assert.equal(editCompleted.status,409);
+const deleteCompleted=await fetch(url+'/api/manage/rating-matches/faction-match-1',{method:'DELETE'});assert.equal(deleteCompleted.status,409);
+const invalidResult=await fetch(url+'/api/manage/rating-matches',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player1Id:'gg',player2Id:'mo',scheduledAt:now,completed:true,winnerId:'gg'})});assert.equal(invalidResult.status,400);
 const found=await req('/api/rating-matches/find-opponent',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.ok(found.match.player1Id==='gg'||found.match.player2Id==='gg');assert.equal(found.createdPairs.length,20);
 ids=found.createdPairs.flatMap(m=>[m.player1Id,m.player2Id]);assert.equal(new Set(ids).size,40);assert.ok(!ids.includes('gg'));assert.ok(!ids.includes(found.match.player1Id==='gg'?found.match.player2Id:found.match.player1Id));
 const completedFinal=await req('/api/matches/final-test/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
@@ -90,6 +94,6 @@ const finalTournament=verifyTournament.prepare("SELECT winnerId,winnerName FROM 
 assert.equal(finalTournament.winnerId,'ds');assert.equal(finalTournament.winnerName,'DS Esports');
 assert.equal(verifyTournament.prepare("SELECT completed FROM Match WHERE id='final-test'").get().completed,1);
 verifyTournament.close();
-console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction data, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
+console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, protected completed-match history, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
 }finally{await stop();for(const f of ['test.sqlite','test.sqlite-shm','test.sqlite-wal'])try{fs.rmSync(path.join(dir,f),{force:true});}catch{}try{fs.rmSync(dir,{recursive:true,force:true});}catch{}}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});

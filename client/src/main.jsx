@@ -642,7 +642,7 @@ function CurrencyDashboard() {
         {details.row.tournamentTitles?.length?<div className="currency-title-list">{details.row.tournamentTitles.map(tournament=><div key={tournament.id}><span>{tournament.name} · {tournament.type}</span><strong>{money(tournament.prizeUSD)}</strong></div>)}</div>:<p className="muted">У команды игрока нет сохранённых побед в турнирах.</p>}
         <form onSubmit={saveValuation} className="currency-valuation-form">
           <h3>Стоимость и прогноз</h3>
-          <p className="muted">Укажи подтверждённые значения. Они сохранятся в SQL и будут учитываться в общей стоимости команды.</p>
+          <p className="muted">Значения восстановлены из Screenshot2.pdf. Они сохраняются отдельно; изменение стоимости игрока не меняет стоимость команды автоматически.</p>
           <div className="form-grid">
             <label className="form-field"><span>Стоимость игрока, USD</span><input type="number" min="0" step="1" value={marketValue} onChange={e=>setMarketValue(e.target.value)} placeholder="Например, 6730000"/></label>
             <label className="form-field"><span>Прогноз, USD</span><input type="number" min="0" step="1" value={forecast} onChange={e=>setForecast(e.target.value)} placeholder="Например, 8750000"/></label>

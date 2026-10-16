@@ -74,6 +74,10 @@ assert.equal(factionStats.reduce((sum,row)=>sum+row.losses,0),3);
 assert.equal(factionStats.find(row=>row.faction==='Союз').wins,1);
 assert.equal(factionStats.find(row=>row.faction==='Альянс').wins,1);
 assert.equal(factionStats.find(row=>row.faction==='Империя').wins,1);
+const defaultMain=await req('/api/settings/main-player');assert.equal(defaultMain.player.nickname,'GGanz');
+const changedMain=await req('/api/settings/main-player',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:'mo'})});assert.equal(changedMain.player.nickname,'mONESY');
+assert.equal((await req('/api/settings/main-player')).player.nickname,'mONESY');
+await req('/api/settings/main-player',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:'gg'})});
 let c=await req('/api/currency');let gg=c.players.find(p=>p.nickname==='GGanz'),ds=c.teams.find(t=>t.name==='DS Esports'),as=c.teams.find(t=>t.name==='Astralis');
 assert.equal(gg.matchIncome,129000);assert.ok(Math.abs(gg.tournamentIncome-595000)<1);assert.ok(Math.abs(gg.totalIncome-724000)<1);
 assert.equal(ds.matchIncome,330000);assert.equal(ds.tournamentIncome,7500000);assert.equal(ds.shareIncome,402000);assert.equal(ds.totalIncome,8232000);
@@ -106,6 +110,6 @@ const finalTournament=verifyTournament.prepare("SELECT winnerId,winnerName FROM 
 assert.equal(finalTournament.winnerId,'ds');assert.equal(finalTournament.winnerName,'DS Esports');
 assert.equal(verifyTournament.prepare("SELECT completed FROM Match WHERE id='final-test'").get().completed,1);
 verifyTournament.close();
-console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, protected completed-match history, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
+console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, saved main-player settings, protected completed-match history, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
 }finally{await stop();for(const f of ['test.sqlite','test.sqlite-shm','test.sqlite-wal'])try{fs.rmSync(path.join(dir,f),{force:true});}catch{}try{fs.rmSync(dir,{recursive:true,force:true});}catch{}}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});

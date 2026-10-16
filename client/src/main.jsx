@@ -314,7 +314,7 @@ function App() {
 
 const staticOptions = {
   faction: [{value:'Альянс',label:'Альянс'},{value:'Союз',label:'Союз'},{value:'Империя',label:'Империя'}],
-  type: ['Champions League','Grand League','Astra League','Ultimate League','FFA League'].map(value=>({value,label:value})),
+  type: ['Champions League','Grand League','Astra League','Ultimate League','FFA League','Outsiders League'].map(value=>({value,label:value})),
   position: ['Игрок','Капитан','Тренер','Менеджер'].map(value=>({value,label:value})),
   boolean: [{value:'0',label:'Нет'},{value:'1',label:'Да'}]
 };
@@ -373,9 +373,7 @@ function fieldsFor(page,subtab) {
     'rating-matches': [
       {name:'player1Id',label:'Игрок 1',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname',required:true},
       {name:'player2Id',label:'Игрок 2',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname',required:true},
-      {name:'scheduledAt',label:'Дата и время',type:'datetime-local',required:true},{name:'map',label:'Карта'},
-      {name:'completed',label:'Матч завершён',type:'select',options:'boolean'},
-      {name:'winnerId',label:'Победитель',type:'remote',endpoint:'/api/players',valueKey:'id',labelKey:'nickname'}
+      {name:'scheduledAt',label:'Дата и время',type:'datetime-local',required:true},{name:'map',label:'Карта'}
     ],
     seasons: [
       {name:'name',label:'Название сезона',required:true},{name:'startDate',label:'Начало',type:'datetime-local',required:true},

@@ -755,11 +755,11 @@ function MapStatsPanel({rows}) {
   },{wins:0,losses:0});
   const players = selectedRows.filter(row=>row.playerName).reduce((acc,row)=>{
     const key=row.playerId || row.playerName;
-    if(!acc.has(key)) acc.set(key,{name:row.playerName,wins:0,losses:0});
+    if(!acc.has(key)) acc.set(key,{name:row.playerName,team:row.teamName||'—',wins:0,losses:0});
     const item=acc.get(key); item.wins+=Number(row.wins||0); item.losses+=Number(row.losses||0);
     return acc;
   },new Map());
-  const bestWins=[...players.values()].sort((a,b)=>b.wins-a.wins || a.losses-b.losses).slice(0,5);
+  const bestWins=[...players.values()].sort((a,b)=>b.wins-a.wins || a.losses-b.losses).slice(0,3);
   const mostLosses=[...players.values()].sort((a,b)=>b.losses-a.losses || a.wins-b.wins).slice(0,5);
   const playerFaction = new Map(rosterPlayers.map(player=>[player.id,player.faction]));
   const factionStats = selectedRows.reduce((acc,row)=>{
@@ -785,8 +785,8 @@ function MapStatsPanel({rows}) {
       <div className="map-stat-card"><span>Игроков со статистикой</span><strong>{players.size}</strong></div>
     </div>
     <div className="map-stats-columns">
-      <section className="map-stats-list"><h3>Лучшие игроки по победам</h3>{bestWins.length ? bestWins.map((player,i)=><div className="map-stat-row" key={player.name}><span className="map-stat-place">{i+1}</span><strong>{player.name}</strong><span>{player.wins} побед</span></div>) : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>
-      <section className="map-stats-list"><h3>Игроки с наибольшими поражениями</h3>{mostLosses.length ? mostLosses.map((player,i)=><div className="map-stat-row" key={player.name}><span className="map-stat-place">{i+1}</span><strong>{player.name}</strong><span>{player.losses} пораж.</span></div>) : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>
+      <section className="map-stats-list"><h3>Топ-3 победителей</h3>{bestWins.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Игрок</th><th>Команда</th><th>Побед</th></tr></thead><tbody>{bestWins.map(player=><tr key={player.name}><td>{player.name}</td><td>{player.team}</td><td>{player.wins}</td></tr>)}</tbody></table></div> : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>
+      <section className="map-stats-list"><h3>Топ-3 проигрывающих</h3>{mostLosses.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Игрок</th><th>Команда</th><th>Поражений</th></tr></thead><tbody>{mostLosses.map(player=><tr key={player.name}><td>{player.name}</td><td>{player.team}</td><td>{player.losses}</td></tr>)}</tbody></table></div> : <p className="muted">Нет статистики игроков по этой карте.</p>}</section>
     </div>
     <section className="map-stats-list map-faction-efficiency">
       <h3>Эффективность фракций на карте</h3>

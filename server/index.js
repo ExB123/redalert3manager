@@ -433,6 +433,22 @@ function simulateRankedMatch(match, playersById, rules, nowIso, forcedWinnerId =
     .run(loseMMR,loser.id);
   db.prepare('UPDATE RatingMatch SET completed=1,winnerId=?,updatedAt=? WHERE id=? AND completed=0')
     .run(winner.id,nowIso,match.id);
+  // Keep the map dashboard in sync with every completed ranked match.
+  // MapStat stores one row per player and map; this update is inside the caller's transaction.
+  if (match.map) {
+    const mapId = db.prepare('SELECT id FROM Map WHERE name=? COLLATE NOCASE').get(match.map)?.id || null;
+    const findMapStat = db.prepare(`SELECT id FROM MapStat
+      WHERE playerId=? AND ((? IS NOT NULL AND mapId=?) OR mapName=? COLLATE NOCASE)
+      ORDER BY CASE WHEN mapId=? THEN 0 ELSE 1 END LIMIT 1`);
+    const updateMapStat = db.prepare('UPDATE MapStat SET wins=COALESCE(wins,0)+?,losses=COALESCE(losses,0)+? WHERE id=?');
+    const insertMapStat = db.prepare('INSERT INTO MapStat (id,mapName,mapId,wins,losses,teamId,playerId,createdAt) VALUES (?,?,?,?,?,?,?,?)');
+    for (const player of [first,second]) {
+      const won = player.id === winner.id;
+      const stat = findMapStat.get(player.id,mapId,mapId,match.map,mapId);
+      if (stat) updateMapStat.run(won ? 1 : 0,won ? 0 : 1,stat.id);
+      else insertMapStat.run(crypto.randomUUID().replace(/-/g,''),match.map,mapId,won ? 1 : 0,won ? 0 : 1,null,player.id,nowIso);
+    }
+  }
   for (const player of [first,second]) {
     const fresh = db.prepare('SELECT id,nickname,COALESCE(ratingPoints,0) AS ratingPoints,COALESCE(ratingGames,0) AS ratingGames,COALESCE(ratingWins,0) AS ratingWins,COALESCE(ratingLosses,0) AS ratingLosses,COALESCE(rpPoints,0) AS rpPoints,COALESCE(rpPeak,0) AS rpPeak FROM Player WHERE id=?').get(player.id);
     playersById.set(player.id,fresh);
@@ -617,7 +633,7 @@ const editableEntities = {
   players: { table: 'Player', fields: ['nickname','faction','teamId','experience','wins','ratingPoints','ratingGames','ratingWins','ratingLosses','rpPoints','rpPeak','isTeamCaptain','position','bestMap','worstMap','rankId','matchWins','matchLosses'], required: ['nickname','faction','teamId'] },
   tournaments: { table: 'Tournament', fields: ['name','description','imageUrl','type','seasonId','seasonNumber','winnerId','winnerName'], required: ['name'] },
   matches: { table: 'Match', fields: ['tournamentId','homeTeamId','awayTeamId','homeScore','awayScore','round','map','nextMatchId','simulationLog'], required: ['tournamentId'] },
-  'rating-matches': { table: 'RatingMatch', fields: ['player1Id','player2Id','scheduledAt','completed','winnerId','map'], required: ['player1Id','player2Id','scheduledAt'] },
+  'rating-matches': { table: 'RatingMatch', fields: ['player1Id','player2Id','scheduledAt','map'], required: ['player1Id','player2Id','scheduledAt'] },
   seasons: { table: 'Season', fields: ['name','startDate','endDate','isActive'], required: ['name'] },
   maps: { table: 'Map', fields: ['name','imageUrl','description','playersCount'], required: ['name'] },
   'map-stats': { table: 'MapStat', fields: ['mapName','mapId','teamId','playerId','wins','losses'], required: ['mapName'] },
@@ -664,6 +680,13 @@ app.post('/api/manage/:entity', (req, res) => {
   if (!entity) return;
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
+    if (entity.table === 'RatingMatch') {
+      if (body.completed || body.winnerId) return res.status(400).json({ error: 'Результат рейтингового матча фиксируется только кнопкой выбора победителя.' });
+      if (body.player1Id && body.player2Id && body.player1Id === body.player2Id) return res.status(400).json({ error: 'Игроки в рейтинговом матче должны различаться.' });
+      if (body.player1Id && !db.prepare('SELECT id FROM Player WHERE id=?').get(body.player1Id)) return res.status(400).json({ error: 'Первый игрок не найден.' });
+      if (body.player2Id && !db.prepare('SELECT id FROM Player WHERE id=?').get(body.player2Id)) return res.status(400).json({ error: 'Второй игрок не найден.' });
+      if (body.scheduledAt && !Number.isFinite(Date.parse(body.scheduledAt))) return res.status(400).json({ error: 'Укажите корректные дату и время матча.' });
+    }
     for (const field of entity.required) {
       if (body[field] === undefined || body[field] === null || String(body[field]).trim() === '') {
         return res.status(400).json({ error: 'Заполните обязательное поле: ' + field });
@@ -675,6 +698,7 @@ app.post('/api/manage/:entity', (req, res) => {
     for (const field of fields) row[field] = normalizeField(field, body[field]);
     const columns = tableColumns(entity.table);
     if (columns.has('updatedAt')) row.updatedAt = new Date().toISOString();
+    if (entity.table === 'RatingMatch') { row.completed = 0; row.winnerId = null; }
     row.id = crypto.randomUUID().replace(/-/g, '');
     const keys = Object.keys(row).filter(key => row[key] !== undefined);
     const sql = `INSERT INTO "${entity.table}" (${keys.map(key => '"' + key + '"').join(',')}) VALUES (${keys.map(() => '?').join(',')})`;
@@ -689,10 +713,19 @@ app.put('/api/manage/:entity/:id', (req, res) => {
   const entity = getEntityConfig(req, res);
   if (!entity) return;
   try {
-    const exists = db.prepare(`SELECT id FROM "${entity.table}" WHERE id = ?`).get(req.params.id);
+    const exists = db.prepare(`SELECT * FROM "${entity.table}" WHERE id = ?`).get(req.params.id);
     if (!exists) return res.status(404).json({ error: 'Запись не найдена.' });
-    if (entity.table === 'Match' && db.prepare('SELECT completed FROM Match WHERE id=?').get(req.params.id)?.completed) return res.status(409).json({ error: 'Завершённый матч зафиксирован. Для изменения результата нужен отдельный откат статистики.' });
+    if (entity.table === 'Match' && exists.completed) return res.status(409).json({ error: 'Завершённый матч зафиксирован. Для изменения результата нужен отдельный откат статистики.' });
+    if (entity.table === 'RatingMatch' && exists.completed) return res.status(409).json({ error: 'Завершённый рейтинговый матч зафиксирован, чтобы не нарушить рейтинги и историю.' });
     const body = req.body && typeof req.body === 'object' ? req.body : {};
+    if (entity.table === 'RatingMatch') {
+      if (Object.prototype.hasOwnProperty.call(body,'completed') || Object.prototype.hasOwnProperty.call(body,'winnerId')) return res.status(400).json({ error: 'Результат рейтингового матча нельзя менять через форму редактирования.' });
+      const player1Id = body.player1Id ?? exists.player1Id;
+      const player2Id = body.player2Id ?? exists.player2Id;
+      if (!player1Id || !player2Id || player1Id === player2Id) return res.status(400).json({ error: 'Игроки в рейтинговом матче должны различаться.' });
+      if (!db.prepare('SELECT id FROM Player WHERE id=?').get(player1Id) || !db.prepare('SELECT id FROM Player WHERE id=?').get(player2Id)) return res.status(400).json({ error: 'Один из участников матча не найден.' });
+      if (body.scheduledAt && !Number.isFinite(Date.parse(body.scheduledAt))) return res.status(400).json({ error: 'Укажите корректные дату и время матча.' });
+    }
     const fields = entity.fields.filter(field => body[field] !== undefined);
     if (!fields.length) return res.status(400).json({ error: 'Нет полей для обновления.' });
     for (const field of entity.required) {
@@ -715,6 +748,7 @@ app.delete('/api/manage/:entity/:id', (req, res) => {
   if (!entity) return;
   try {
     if (entity.table === 'Match' && db.prepare('SELECT completed FROM Match WHERE id=?').get(req.params.id)?.completed) return res.status(409).json({ error: 'Завершённый матч нельзя удалить, потому что его результат уже учтён в статистике.' });
+    if (entity.table === 'RatingMatch' && db.prepare('SELECT completed FROM RatingMatch WHERE id=?').get(req.params.id)?.completed) return res.status(409).json({ error: 'Завершённый рейтинговый матч нельзя удалить: его результат уже учтён в рейтингах и статистике.' });
     const result = db.prepare(`DELETE FROM "${entity.table}" WHERE id = ?`).run(req.params.id);
     if (!result.changes) return res.status(404).json({ error: 'Запись не найдена.' });
     res.json({ ok: true, deletedId: req.params.id });

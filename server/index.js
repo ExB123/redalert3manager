@@ -76,10 +76,13 @@ app.get('/api/summary', (_req, res) => res.json({
 }));
 
 app.get('/api/teams', (_req, res) => {
-  res.json(db.prepare(`SELECT t.id,t.name,t.logoUrl,t.wins,t.losses,t.points,t.level,
+  const rows = db.prepare(`SELECT t.id,t.name,t.logoUrl,t.wins,t.losses,t.points,t.level,
     COALESCE(t.bestMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId JOIN Player mp ON mp.id=ms.playerId WHERE mp.teamId=t.id AND (ms.wins+ms.losses)>0 GROUP BY COALESCE(m.name,ms.mapName) ORDER BY SUM(ms.wins) DESC,SUM(ms.losses) ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS bestMap,
-    COALESCE(t.worstMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId JOIN Player mp ON mp.id=ms.playerId WHERE mp.teamId=t.id AND (ms.wins+ms.losses)>0 GROUP BY COALESCE(m.name,ms.mapName) ORDER BY SUM(ms.losses) DESC,SUM(ms.wins) ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS worstMap
-    FROM Team t ORDER BY t.points DESC, t.wins DESC, t.name ASC`).all());
+    COALESCE(t.worstMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId JOIN Player mp ON mp.id=ms.playerId WHERE mp.teamId=t.id AND (ms.wins+ms.losses)>0 GROUP BY COALESCE(m.name,ms.mapName) ORDER BY SUM(ms.losses) DESC,SUM(ms.wins) ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS worstMap,
+    (SELECT COUNT(*) FROM Tournament tr WHERE tr.winnerId=t.id OR (tr.winnerId IS NULL AND tr.winnerName=t.name)) AS tournamentWins
+    FROM Team t ORDER BY t.points DESC, t.wins DESC, t.name ASC`).all()
+    .map(team=>({...team,rankingLevel:Math.max(1,Math.floor(Number(team.wins||0)/10)+Number(team.tournamentWins||0))}));
+  res.json(rows);
 });
 app.get('/api/players', (_req, res) => {
   res.json(db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.experience,p.wins,p.ratingPoints,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.rpPeak,p.position,p.isTeamCaptain,p.rankId,

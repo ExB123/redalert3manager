@@ -371,3 +371,53 @@ tbody tr:hover{background:#0a1425}
 .backup-table td{vertical-align:middle}
 .backup-table .muted{font-size:12px}
 @media(max-width:760px){.backup-panel .panel-head{flex-direction:column}.backup-panel .panel-head .primary{width:100%;justify-content:center}}
+
+.mail-workspace{display:grid;gap:16px}
+.mail-toolbar-panel{padding:18px}
+.mail-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.mail-summary h2,.mail-detail-top h2{margin:0 0 6px}
+.mail-summary .muted{margin:0}
+.mail-counts{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.mail-counts strong{font-size:18px;margin-left:7px}
+.mail-counts span{font-size:12px;color:var(--muted,#9ba9c5)}
+.mail-filters{display:grid;grid-template-columns:minmax(220px,1.7fr) minmax(140px,.8fr) minmax(160px,.9fr);gap:12px;margin-top:18px}
+.mail-layout{display:grid;grid-template-columns:minmax(320px,.9fr) minmax(360px,1.2fr);gap:16px;align-items:start}
+.mail-list-panel,.mail-detail-panel{padding:0;overflow:hidden}
+.mail-list-heading{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line,#26324a)}
+.mail-list-heading h3{margin:0}
+.mail-list-heading span{font-size:12px;color:var(--muted,#9ba9c5)}
+.mail-list-scroll{max-height:700px;overflow:auto}
+.mail-list-item{width:100%;display:flex;align-items:flex-start;gap:11px;padding:14px 16px;border:0;border-bottom:1px solid var(--line,#26324a);background:transparent;color:inherit;text-align:left;cursor:pointer}
+.mail-list-item:hover,.mail-list-item.active{background:rgba(72,115,184,.12)}
+.mail-list-item.unread .mail-list-copy strong{font-weight:750;color:#fff}
+.mail-type-icon{width:32px;height:32px;flex:0 0 32px;display:grid;place-items:center;border-radius:9px;background:rgba(120,145,185,.12);color:#9db7e5}
+.mail-kind-transfer{color:#f3c46a}
+.mail-kind-cooperation{color:#7ec9b0}
+.mail-kind-congrats{color:#8eb8ff}
+.mail-kind-general{color:#a8b2c9}
+.mail-list-copy{min-width:0;display:grid;gap:5px;flex:1}
+.mail-list-copy strong{font-size:13px;line-height:1.4}
+.mail-list-copy>span{font-size:12px;line-height:1.5;color:var(--muted,#9ba9c5);overflow-wrap:anywhere}
+.mail-list-copy small{font-size:10px;color:var(--muted,#8b99b5)}
+.mail-unread-dot{width:7px;height:7px;border-radius:50%;background:#ef4444;flex:0 0 7px;margin-top:7px}
+.mail-empty{padding:18px}
+.mail-detail-panel{min-height:400px;padding:20px}
+.mail-no-selection{min-height:360px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#8da2c8;gap:8px}
+.mail-no-selection h3,.mail-no-selection p{margin:0}
+.mail-detail-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.mail-detail-top>div{min-width:0}
+.mail-detail-top .ranked-secondary{flex:0 0 auto}
+.mail-detail-top h2{font-size:20px;overflow-wrap:anywhere}
+.mail-detail-top .muted{font-size:12px;margin:0}
+.mail-kind-pill{display:inline-block;font-size:11px;font-weight:650;padding:4px 8px;border-radius:99px;background:rgba(120,145,185,.12);margin-bottom:10px}
+.mail-message-body{white-space:pre-wrap;line-height:1.75;margin:22px 0;padding:18px;background:rgba(7,14,30,.65);border:1px solid var(--line,#26324a);border-radius:12px;overflow-wrap:anywhere}
+.mail-offer-details{margin:18px 0}
+.mail-offer-details h3{font-size:15px;margin:0 0 12px}
+.mail-offer-details .currency-detail-grid{margin-top:0}
+.mail-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.mail-actions button{display:inline-flex;align-items:center;gap:7px}
+.mail-response-status{margin-top:20px;padding:12px 14px;border-radius:10px;font-size:13px}
+.mail-response-status.accepted{background:rgba(34,197,94,.12);color:#6ee7a4}
+.mail-response-status.declined{background:rgba(239,68,68,.1);color:#fca5a5}
+@media(max-width:1000px){.mail-layout{grid-template-columns:1fr}.mail-list-scroll{max-height:420px}.mail-filters{grid-template-columns:1fr 1fr}.mail-filters .form-field:first-child{grid-column:1/-1}}
+@media(max-width:600px){.mail-summary{flex-direction:column}.mail-counts{white-space:normal}.mail-filters{grid-template-columns:1fr}.mail-filters .form-field:first-child{grid-column:auto}.mail-detail-top{flex-direction:column}.mail-detail-top .ranked-secondary{width:100%}}

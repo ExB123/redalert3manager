@@ -110,6 +110,15 @@ const finalTournament=verifyTournament.prepare("SELECT winnerId,winnerName FROM 
 assert.equal(finalTournament.winnerId,'ds');assert.equal(finalTournament.winnerName,'DS Esports');
 assert.equal(verifyTournament.prepare("SELECT completed FROM Match WHERE id='final-test'").get().completed,1);
 verifyTournament.close();
-console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, saved main-player settings, protected completed-match history, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
+const backup=await req('/api/backups',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+assert.ok(backup.ok&&backup.id&&backup.tableCount>0);
+const backupList=await req('/api/backups');assert.ok(backupList.some(item=>item.id===backup.id&&item.restorable));
+await req('/api/manage/teams/ds',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Temporary Backup Test Team'})});
+assert.ok((await req('/api/teams')).some(team=>team.name==='Temporary Backup Test Team'));
+const restored=await req('/api/backups/'+backup.id+'/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+assert.equal(restored.ok,true);
+assert.ok((await req('/api/teams')).some(team=>team.name==='DS Esports'));
+assert.ok(!(await req('/api/teams')).some(team=>team.name==='Temporary Backup Test Team'));
+console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, saved main-player settings, protected completed-match history, full database backup and restore, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
 }finally{await stop();for(const f of ['test.sqlite','test.sqlite-shm','test.sqlite-wal'])try{fs.rmSync(path.join(dir,f),{force:true});}catch{}try{fs.rmSync(dir,{recursive:true,force:true});}catch{}}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});

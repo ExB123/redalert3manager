@@ -556,10 +556,11 @@ function CurrencyDashboard() {
   }
   async function saveValuation(event) {
     event.preventDefault();
-    if(!details||details.kind!=='players')return;
+    if(!details)return;
     setSaving(true);setError('');setMessage('');
     try {
-      const response=await fetch('/api/currency/players/'+encodeURIComponent(details.row.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({marketValueUSD:marketValue===''?null:Number(marketValue),forecastUSD:forecast===''?null:Number(forecast)})});
+      const endpoint=details.kind==='players'?'/api/currency/players/':'/api/currency/teams/';
+      const response=await fetch(endpoint+encodeURIComponent(details.row.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({marketValueUSD:marketValue===''?null:Number(marketValue),forecastUSD:forecast===''?null:Number(forecast)})});
       const body=await response.json();
       if(!response.ok)throw new Error(body.error||'Не удалось сохранить оценку игрока.');
       await loadCurrency();
@@ -656,11 +657,19 @@ function CurrencyDashboard() {
           <div><span>Доля от доходов игроков</span><strong>{money(details.row.shareIncome)}</strong></div>
           <div><span>Итого</span><strong>{money(details.row.totalIncome)}</strong></div>
           <div><span>Игроков в команде</span><strong>{details.row.playerCount}</strong></div>
-          <div><span>Стоимость состава</span><strong>{shortMoney(details.row.marketValueUSD)}</strong></div>
+          <div><span>Стоимость команды</span><strong>{shortMoney(details.row.marketValueUSD)}</strong></div>
         </div>
         <h3 className="currency-subheading">Состав команды</h3>
         <div className="currency-title-list">{details.row.players.map(player=><div key={player.id}><span>{player.nickname}</span><strong>{money(player.totalIncome)}</strong></div>)}</div>
-        <p className="muted">Стоимость и прогноз команды суммируются из сохранённых оценок игроков. Чтобы заполнить их, открой аналитику каждого игрока.</p>
+        <form onSubmit={saveValuation} className="currency-valuation-form">
+          <h3>Стоимость команды и прогноз</h3>
+          <p className="muted">Значения восстановлены из Screenshot2.pdf. Их можно изменить, и они сохранятся отдельно от стоимости игроков.</p>
+          <div className="form-grid">
+            <label className="form-field"><span>Стоимость команды, USD</span><input type="number" min="0" step="1" value={marketValue} onChange={e=>setMarketValue(e.target.value)} placeholder="Стоимость команды"/></label>
+            <label className="form-field"><span>Прогноз, USD</span><input type="number" min="0" step="1" value={forecast} onChange={e=>setForecast(e.target.value)} placeholder="Прогноз"/></label>
+          </div>
+          <div className="modal-actions"><button type="button" className="secondary" onClick={()=>{setMarketValue('');setForecast('');}}>Очистить значения</button><button className="primary" type="submit" disabled={saving}>{saving?'Сохранение…':'Сохранить'}</button></div>
+        </form>
       </>}
       {message&&<div className="success-message">{message}</div>}
       {error&&<div className="error">{error}</div>}

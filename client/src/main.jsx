@@ -646,10 +646,17 @@ function RatingMatchesTable({rows,onComplete}) {
 
 function FactionStatsPanel({rows}) {
   const [players,setPlayers] = useState([]);
+  const [ratingMatches,setRatingMatches] = useState([]);
   useEffect(() => {
     let active=true;
     fetch('/api/players').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить игроков.');if(active)setPlayers(Array.isArray(body)?body:[]);})
       .catch(()=>{if(active)setPlayers([]);});
+    return ()=>{active=false;};
+  },[]);
+  useEffect(() => {
+    let active=true;
+    fetch('/api/rating-matches').then(async response=>{const body=await response.json();if(!response.ok)throw new Error('Не удалось загрузить историю рейтинговых матчей.');if(active)setRatingMatches(Array.isArray(body)?body:[]);})
+      .catch(()=>{if(active)setRatingMatches([]);});
     return ()=>{active=false;};
   },[]);
   const totalWins=rows.reduce((sum,row)=>sum+Number(row.wins||0),0);
@@ -658,6 +665,30 @@ function FactionStatsPanel({rows}) {
     const wins=Number(row.wins||0),losses=Number(row.losses||0),games=wins+losses;
     return {...row,games,winRate:games?Math.round(wins/games*100):0,share:totalWins?Math.round(wins/totalWins*100):0};
   }).sort((a,b)=>b.wins-a.wins);
+  const normalizeFaction = value => {
+    const v=String(value||'').trim().toLowerCase();
+    if(v.includes('альянс')||v.includes('allied')||v.includes('allies'))return 'Альянс';
+    if(v.includes('союз')||v.includes('soviet'))return 'Союз';
+    if(v.includes('импер')||v.includes('empire'))return 'Империя';
+    return '';
+  };
+  const factionOrder = {'Альянс':0,'Империя':1,'Союз':2};
+  const playerById = new Map(players.map(player=>[player.id,player]));
+  const matchupMap = new Map();
+  ratingMatches.filter(match=>Boolean(match.completed)&&match.winnerId).forEach(match=>{
+    const p1=playerById.get(match.player1Id),p2=playerById.get(match.player2Id);
+    const f1=normalizeFaction(p1?.faction),f2=normalizeFaction(p2?.faction);
+    if(!f1||!f2||f1===f2)return;
+    const [first,second]=[f1,f2].sort((x,y)=>factionOrder[x]-factionOrder[y]);
+    const key=first+'|'+second;
+    if(!matchupMap.has(key))matchupMap.set(key,{first,second,matches:0,firstWins:0,secondWins:0});
+    const item=matchupMap.get(key);item.matches++;
+    const winnerFaction=match.winnerId===p1?.id?f1:match.winnerId===p2?.id?f2:'';
+    if(winnerFaction===first)item.firstWins++;
+    else if(winnerFaction===second)item.secondWins++;
+    else item.matches--;
+  });
+  const matchups=[...matchupMap.values()].filter(item=>item.matches>0).sort((a,b)=>factionOrder[a.first]-factionOrder[b.first]||factionOrder[a.second]-factionOrder[b.second]);
   if(!rows.length) return <div className="empty-state">Статистика фракций пока отсутствует в базе.</div>;
   return <div className="faction-dashboard">
     <div className="faction-overview-grid">
@@ -682,9 +713,10 @@ function FactionStatsPanel({rows}) {
     </section>
     <section className="faction-detail-table panel">
       <h3>Исход встреч фракций</h3>
-      <p className="muted">Нет достаточных исторических данных для достоверной таблицы: база не сохраняет фракции обоих участников на момент каждого матча. Таблица появится после добавления этой информации к новым матчам; исторические результаты не будут выдумываться.</p>
+      <p className="muted">Результаты рассчитаны по завершённым рейтинговым матчам и текущим фракциям игроков. Если игрок менял фракцию, историческая принадлежность может отличаться.</p>
+      {matchups.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Пара фракций</th><th>Матчи</th><th>Победы первой</th><th>Победы второй</th><th>Винрейт (первая/вторая)</th></tr></thead><tbody>{matchups.map(item=>{const decided=item.firstWins+item.secondWins;return <tr key={item.first+'|'+item.second}><td><FactionName value={item.first}/> vs <FactionName value={item.second}/></td><td>{item.matches}</td><td>{item.firstWins}</td><td>{item.secondWins}</td><td>{decided?Math.round(item.firstWins/decided*100):0}% / {decided?Math.round(item.secondWins/decided*100):0}%</td></tr>;})}</tbody></table></div> : <p className="muted">Нет завершённых рейтинговых матчей с известными фракциями обоих участников.</p>}
     </section>
-    <p className="muted">Суммарные победы и поражения взяты из статистики игроков в базе. Сравнение фракций между собой пока не рассчитывается, чтобы не показывать недостоверные числа.</p>
+    <p className="muted">Суммарные показатели взяты из статистики игроков; очные встречи рассчитаны из сохранённых результатов матчей.</p>
   </div>;
 }
 

@@ -184,7 +184,7 @@ function App() {
           <div className="home-grid">{homeCards.map(([name,desc,id,Icon])=><article className="home-card" key={id}><h2><Icon size={22}/>{name}</h2><p>{desc}</p><button className="primary" onClick={() => goPage(id)}>Перейти</button></article>)}</div>
         </> : <>
           <h1 className="page-title">{title}</h1>
-          {page === 'settings' ? <SettingsPanel /> : null}
+          {page === 'settings' ? <><SettingsPanel /><BackupPanel /></> : null}
           {page === 'rating' && <div className="tabs rating-tabs">{ratingTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'league' && <div className="tabs">{leagueTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'maps' && <div className="tabs"><button className={subtab==='Карты'?'selected':''} onClick={()=>setSubtab('Карты')}>Карты</button><button className={subtab==='Статистика карт'?'selected':''} onClick={()=>setSubtab('Статистика карт')}>Статистика карт</button></div>}
@@ -1133,6 +1133,57 @@ function SettingsPanel() {
     <p className="muted">По умолчанию используется GGanz, если он есть в базе. Выбор сохраняется в SQL-базе.</p>
     {message && <div className="success-message">{message}</div>}
     {error && <div className="error">{error}</div>}
+  </section>;
+}
+
+function BackupPanel() {
+  const [backups,setBackups] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [busy,setBusy] = useState(false);
+  const [error,setError] = useState('');
+  const [message,setMessage] = useState('');
+  async function loadBackups() {
+    setLoading(true);setError('');
+    try {
+      const response=await fetch('/api/backups');
+      const body=await response.json();
+      if(!response.ok)throw new Error(body.error||'Не удалось загрузить резервные копии.');
+      setBackups(Array.isArray(body)?body:[]);
+    } catch(e) {setError(e.message||'Не удалось загрузить резервные копии.');}
+    finally {setLoading(false);}
+  }
+  useEffect(()=>{loadBackups();},[]);
+  async function createBackup() {
+    setBusy(true);setError('');setMessage('');
+    try {
+      const response=await fetch('/api/backups',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+      const body=await response.json();
+      if(!response.ok)throw new Error(body.error||'Не удалось создать резервную копию.');
+      setMessage('Полная резервная копия создана. Сохранено таблиц: '+body.tableCount+'.');
+      await loadBackups();
+    } catch(e) {setError(e.message||'Не удалось создать резервную копию.');}
+    finally {setBusy(false);}
+  }
+  async function restoreBackup(backup) {
+    if(!backup.restorable)return;
+    if(!window.confirm('Восстановить базу из копии от '+new Date(backup.createdAt).toLocaleString('ru-RU')+'? Текущие данные приложения будут заменены данными из выбранной копии. Сначала рекомендуется создать новую копию.'))return;
+    setBusy(true);setError('');setMessage('');
+    try {
+      const response=await fetch('/api/backups/'+encodeURIComponent(backup.id)+'/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+      const body=await response.json();
+      if(!response.ok)throw new Error(body.error||'Не удалось восстановить резервную копию.');
+      setMessage('База восстановлена. Перезагрузите страницу, чтобы обновить все разделы.');
+      await loadBackups();
+    } catch(e) {setError(e.message||'Не удалось восстановить резервную копию.');}
+    finally {setBusy(false);}
+  }
+  const rowCount=backup=>Object.values(backup.counts||{}).reduce((sum,count)=>sum+Number(count||0),0);
+  return <section className="panel backup-panel">
+    <div className="panel-head"><div><h2>Резервные копии базы</h2><p className="muted">Полная копия данных приложения: игроки, команды, матчи, рейтинги, турниры, настройки и связанные таблицы.</p></div><button className="primary" onClick={createBackup} disabled={busy}><Save size={16}/>{busy?'Обработка…':'Создать копию'}</button></div>
+    {message&&<div className="success-message">{message}</div>}
+    {error&&<div className="error"><CircleAlert size={16}/>{error}</div>}
+    {loading?<p className="muted">Загрузка списка копий…</p>:!backups.length?<p className="muted">Резервных копий пока нет. Создай первую копию перед изменениями базы.</p>:<div className="table-wrap"><table className="data-table backup-table"><thead><tr><th>Дата создания</th><th>Таблиц</th><th>Записей</th><th>Тип</th><th>Действие</th></tr></thead><tbody>{backups.map(backup=><tr key={backup.id}><td>{backup.createdAt?new Date(backup.createdAt).toLocaleString('ru-RU'):'—'}</td><td>{backup.tableCount||0}</td><td>{rowCount(backup).toLocaleString('ru-RU')}</td><td>{backup.restorable?'Полная копия':'Старая запись — неполная копия'}</td><td>{backup.restorable?<button className="ranked-secondary" onClick={()=>restoreBackup(backup)} disabled={busy}>Восстановить</button>:<span className="muted">Недоступно</span>}</td></tr>)}</tbody></table></div>}
+    <p className="muted">Старые записи BackupLog из исходной базы могли содержать только команды и игроков. Они отображаются в списке, но не используются для восстановления всей базы.</p>
   </section>;
 }
 

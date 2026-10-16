@@ -1007,7 +1007,7 @@ function PlayerCabinet({players,onFindMatch}) {
         {!history.length?<p className="muted">Завершённых рейтинговых матчей пока нет.</p>:<div className="table-wrap"><table className="data-table cabinet-history-table"><thead><tr><th>Дата</th><th>Соперник</th><th>Результат</th></tr></thead><tbody>{history.map(match=>{
           const opponentName=match.player1Id===player.id?match.player2:match.player1;
           const won=match.winnerId===player.id;
-          return <tr key={match.id}><td>{formatDate(match.scheduledAt)}</td><td>{opponentName||'—'}</td><td><span className={'match-result '+(won?'win':'loss')}>{won?'Победа':'Поражение'}</span></td></tr>;
+          return <tr key={match.id}><td>{match.scheduledAt?new Date(match.scheduledAt).toLocaleDateString('ru-RU'):'—'}</td><td>{opponentName||'—'}</td><td><span className={'match-result '+(won?'win':'loss')}>{won?'Победа':'Поражение'}</span></td></tr>;
         })}</tbody></table></div>}
       </section>
     </div>

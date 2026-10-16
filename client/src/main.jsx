@@ -497,6 +497,8 @@ function CrudDialog({entity,row,fields,onClose,onSaved}) {
 
 function CurrencyDashboard() {
   const [mode,setMode] = useState('players');
+  const [playerSort,setPlayerSort] = useState({key:'totalIncome',direction:'desc'});
+  const [teamSort,setTeamSort] = useState({key:'totalIncome',direction:'desc'});
   const [players,setPlayers] = useState([]);
   const [teams,setTeams] = useState([]);
   const [rules,setRules] = useState({});
@@ -563,15 +565,32 @@ function CurrencyDashboard() {
     finally{setSaving(false);}
   }
   if(loading)return <div className="empty-state">Загрузка финансовых данных…</div>;
-  const playerRows=[...players].sort((a,b)=>b.totalIncome-a.totalIncome||b.rpPoints-a.rpPoints);
-  const teamRows=[...teams].sort((a,b)=>b.totalIncome-a.totalIncome||b.points-a.points);
+  const sortRows=(rows,sort)=>[...rows].sort((a,b)=>{
+    const av=a[sort.key],bv=b[sort.key];
+    let result;
+    if(av===null||av===undefined||av==='')result=bv===null||bv===undefined||bv===''?0:-1;
+    else if(bv===null||bv===undefined||bv==='')result=1;
+    else if(typeof av==='string'||typeof bv==='string')result=String(av).localeCompare(String(bv),'ru',{numeric:true,sensitivity:'base'});
+    else result=Number(av)-Number(bv);
+    return sort.direction==='desc'?-result:result;
+  });
+  const playerRows=sortRows(players,playerSort);
+  const teamRows=sortRows(teams,teamSort);
+  const playerHeaders=[['Игрок','nickname'],['Команда','teamName'],['Рейт. игры','ratingGames'],['Поб/Пор','ratingWins'],['Рейтинг (win/loss)','matchIncome'],['Турниры','tournamentIncome'],['Итого','totalIncome'],['Стоимость игрока','marketValueUSD'],['Прогноз','forecastUSD'],['Аналитика',null]];
+  const teamHeaders=[['Команда','name'],['Победы','wins'],['Очки','points'],['Уровень','level'],['Доходы (матчи/чемпионы/доля)','totalIncome'],['Итого','totalIncome'],['Стоимость','marketValueUSD'],['Прогноз','forecastUSD'],['Аналитика',null]];
+  const currentSort=mode==='players'?playerSort:teamSort;
+  const toggleSort=key=>{
+    if(!key)return;
+    const setter=mode==='players'?setPlayerSort:setTeamSort;
+    setter(current=>({key,direction:current.key===key&&current.direction==='desc'?'asc':'desc'}));
+  };
   return <div className="currency-dashboard">
     <div className="tabs currency-tabs"><button className={mode==='players'?'selected':''} onClick={()=>setMode('players')}>Игроки</button><button className={mode==='teams'?'selected':''} onClick={()=>setMode('teams')}>Команды</button></div>
     {error&&<div className="error"><CircleAlert size={18}/>{error}</div>}
     <section className="currency-table-card">
       <div className="currency-table-heading"><div><h3>{mode==='players'?'Финансовое состояние игроков':'Финансовое состояние команд'}</h3><p className="muted">Доходы пересчитываются из результатов рейтинговых матчей и побед в турнирах. Стоимость и прогноз сохраняются отдельно.</p></div><span>{mode==='players'?playerRows.length:teamRows.length} записей</span></div>
       <div className="table-wrap"><table className="data-table currency-data-table">
-        <thead><tr>{(mode==='players'?['Игрок','Команда','Рейт. игры','Поб/Пор','Рейтинг (win/loss)','Турниры','Итого','Стоимость игрока','Прогноз','Аналитика']:['Команда','Победы','Очки','Уровень','Доходы (матчи/чемпионы/доля)','Итого','Стоимость','Прогноз','Аналитика']).map(label=><th key={label}>{label}</th>)}</tr></thead>
+        <thead><tr>{(mode==='players'?playerHeaders:teamHeaders).map(([label,key])=><th key={label}>{key?<button type="button" className="sortable-header" onClick={()=>toggleSort(key)}>{label}<span aria-hidden="true">{currentSort.key===key?(currentSort.direction==='asc'?' ↑':' ↓'):' ↕'}</span></button>:label}</th>)}</tr></thead>
         <tbody>{(mode==='players'?playerRows:teamRows).map(row=>{
           if(mode==='players')return <tr key={row.id}>
             <td><span className="currency-player-name"><span className={'player-faction-dot '+(String(row.faction||'').includes('Союз')?'faction-red':String(row.faction||'').includes('Альянс')?'faction-blue':String(row.faction||'').includes('Империя')?'faction-yellow':'faction-neutral')}>●</span>{row.nickname}</span></td>

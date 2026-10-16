@@ -1,9 +1,12 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawn}=require('node:child_process');
+const net=require('node:net');
 const Database=require('better-sqlite3');
 const root=path.join(__dirname,'..'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'ra3-smoke-')),dbPath=path.join(dir,'test.sqlite');
-const port=32000+Math.floor(Math.random()*20000),url='http://127.0.0.1:'+port,now=new Date().toISOString();
+let port=0,url='',child=null,logs='';
+const now=new Date().toISOString();
+function getAvailablePort(){return new Promise((resolve,reject)=>{const server=net.createServer();server.once('error',reject);server.listen(0,'127.0.0.1',()=>{const address=server.address();const available=address.port;server.close(error=>error?reject(error):resolve(available));});});}
 const db=new Database(dbPath);
 db.exec("CREATE TABLE Team(id TEXT PRIMARY KEY,name TEXT NOT NULL,logoUrl TEXT,wins INTEGER DEFAULT 0,losses INTEGER DEFAULT 0,points INTEGER DEFAULT 0,level INTEGER DEFAULT 1,bestMap TEXT,worstMap TEXT,createdAt TEXT,updatedAt TEXT);"+
 "CREATE TABLE Player(id TEXT PRIMARY KEY,nickname TEXT NOT NULL,faction TEXT,teamId TEXT,isTeamCaptain INTEGER DEFAULT 0,ratingGames INTEGER DEFAULT 0,ratingWins INTEGER DEFAULT 0,ratingLosses INTEGER DEFAULT 0,ratingPoints INTEGER DEFAULT 1000,rpPoints INTEGER DEFAULT 0,rpPeak INTEGER DEFAULT 0,experience INTEGER DEFAULT 0,wins INTEGER DEFAULT 0,position TEXT,bestMap TEXT,worstMap TEXT,matchWins INTEGER DEFAULT 0,matchLosses INTEGER DEFAULT 0,rankId TEXT);"+
@@ -58,12 +61,12 @@ addCompletedMatch.run('faction-match-1','gg','mat',now,'gg',now,now,'Обычн�
 addCompletedMatch.run('faction-match-2','mo','ma',now,'ma',now,now,'Обычное столкновение');
 addCompletedMatch.run('faction-match-3','mat','ma',now,'mat',now,now,'Обычное столкновение');
 db.close();
-const child=spawn(process.execPath,[path.join(root,'server','index.js')],{cwd:root,env:{...process.env,DB_PATH:dbPath,PORT:String(port)},stdio:['ignore','pipe','pipe']});
-let logs='';child.stdout.on('data',x=>logs+=x);child.stderr.on('data',x=>logs+=x);
+function startServer(){child=spawn(process.execPath,[path.join(root,'server','index.js')],{cwd:root,env:{...process.env,DB_PATH:dbPath,PORT:String(port)},stdio:['ignore','pipe','pipe']});child.stdout.on('data',x=>logs+=x);child.stderr.on('data',x=>logs+=x);}
 async function req(route,options){const r=await fetch(url+route,options);const j=await r.json();if(!r.ok)throw Error(route+' HTTP '+r.status+' '+JSON.stringify(j));return j;}
 async function wait(){for(let i=0;i<60;i++){if(child.exitCode!==null)throw Error('Server startup failed: '+logs);try{if((await fetch(url+'/api/health')).ok)return;}catch{}await new Promise(r=>setTimeout(r,100));}throw Error('Server timeout: '+logs);}
-async function stop(){if(child.exitCode===null){child.kill('SIGTERM');await Promise.race([new Promise(r=>child.once('exit',r)),new Promise(r=>setTimeout(r,1500))]);if(child.exitCode===null)child.kill('SIGKILL');}}
+async function stop(){if(child&&child.exitCode===null){child.kill('SIGTERM');await Promise.race([new Promise(r=>child.once('exit',r)),new Promise(r=>setTimeout(r,1500))]);if(child.exitCode===null)child.kill('SIGKILL');}}
 async function main(){try{
+port=await getAvailablePort();url='http://127.0.0.1:'+port;startServer();
 await wait();
 const teamApi=await req('/api/teams');
 assert.equal(teamApi.find(team=>team.name==='DS Esports').bestMap,'Обычное столкновение');

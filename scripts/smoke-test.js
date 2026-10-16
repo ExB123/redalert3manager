@@ -30,6 +30,10 @@ tournament.run('gl1','Grand League S1','Grand League','as','Astralis',now);
 tournament.run('gl2','Grand League S2','Champions League','as','Astralis',now);
 db.prepare('INSERT INTO GameConfig(id,key,value,description,createdAt) VALUES(?,?,?,?,?)').run('match','match_win',JSON.stringify({playerPoints:5,playerMMR:50,playerMMR_Loss:-25}),'Match rules',now);
 db.prepare('INSERT INTO Map(id,name,playersCount) VALUES(?,?,?)').run('m1','Обычное столкновение',2);
+const addCompletedMatch=db.prepare('INSERT INTO RatingMatch(id,player1Id,player2Id,scheduledAt,completed,winnerId,createdAt,updatedAt,map) VALUES(?,?,?,?,1,?,?,?,?)');
+addCompletedMatch.run('faction-match-1','gg','mat',now,'gg',now,now,'Обычное столкновение');
+addCompletedMatch.run('faction-match-2','mo','ma',now,'ma',now,now,'Обычное столкновение');
+addCompletedMatch.run('faction-match-3','mat','ma',now,'mat',now,now,'Обычное столкновение');
 db.close();
 const child=spawn(process.execPath,[path.join(root,'server','index.js')],{cwd:root,env:{...process.env,DB_PATH:dbPath,PORT:String(port)},stdio:['ignore','pipe','pipe']});
 let logs='';child.stdout.on('data',x=>logs+=x);child.stderr.on('data',x=>logs+=x);
@@ -38,6 +42,12 @@ async function wait(){for(let i=0;i<60;i++){if(child.exitCode!==null)throw Error
 async function stop(){if(child.exitCode===null){child.kill('SIGTERM');await Promise.race([new Promise(r=>child.once('exit',r)),new Promise(r=>setTimeout(r,1500))]);if(child.exitCode===null)child.kill('SIGKILL');}}
 async function main(){try{
 await wait();
+const factionStats=await req('/api/faction-stats');
+assert.equal(factionStats.reduce((sum,row)=>sum+row.wins,0),3);
+assert.equal(factionStats.reduce((sum,row)=>sum+row.losses,0),3);
+assert.equal(factionStats.find(row=>row.faction==='Союз').wins,1);
+assert.equal(factionStats.find(row=>row.faction==='Альянс').wins,1);
+assert.equal(factionStats.find(row=>row.faction==='Империя').wins,1);
 let c=await req('/api/currency');let gg=c.players.find(p=>p.nickname==='GGanz'),ds=c.teams.find(t=>t.name==='DS Esports'),as=c.teams.find(t=>t.name==='Astralis');
 assert.equal(gg.matchIncome,129000);assert.ok(Math.abs(gg.tournamentIncome-595000)<1);assert.ok(Math.abs(gg.totalIncome-724000)<1);
 assert.equal(ds.matchIncome,330000);assert.equal(ds.tournamentIncome,7500000);assert.equal(ds.shareIncome,402000);assert.equal(ds.totalIncome,8232000);

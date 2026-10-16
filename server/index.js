@@ -38,7 +38,25 @@ app.get('/api/players', (_req, res) => {
     ORDER BY p.rpPoints DESC, p.ratingPoints DESC, p.nickname ASC`).all());
 });
 app.get('/api/faction-stats', (_req, res) => {
-  res.json(db.prepare(`SELECT faction,COUNT(*) AS players,SUM(COALESCE(matchWins,0)) AS wins,SUM(COALESCE(matchLosses,0)) AS losses,SUM(COALESCE(ratingWins,0)) AS ratingWins,SUM(COALESCE(ratingLosses,0)) AS ratingLosses,ROUND(AVG(COALESCE(rpPoints,0)),1) AS averageRP,MAX(COALESCE(rpPeak,0)) AS peakRP FROM Player WHERE faction IS NOT NULL AND TRIM(faction) <> '' GROUP BY faction ORDER BY players DESC,faction ASC`).all());
+  res.json(db.prepare(`WITH player_summary AS (
+      SELECT faction,COUNT(*) AS players,ROUND(AVG(COALESCE(rpPoints,0)),1) AS averageRP,MAX(COALESCE(rpPeak,0)) AS peakRP
+      FROM Player WHERE faction IS NOT NULL AND TRIM(faction)<>'' GROUP BY faction
+    ), winner_summary AS (
+      SELECT p.faction,COUNT(*) AS wins FROM RatingMatch rm JOIN Player p ON p.id=rm.winnerId
+      WHERE rm.completed=1 AND p.faction IS NOT NULL AND TRIM(p.faction)<>'' GROUP BY p.faction
+    ), loser_summary AS (
+      SELECT p.faction,COUNT(*) AS losses
+      FROM RatingMatch rm
+      JOIN Player p ON p.id=CASE WHEN rm.winnerId=rm.player1Id THEN rm.player2Id ELSE rm.player1Id END
+      WHERE rm.completed=1 AND rm.winnerId IN (rm.player1Id,rm.player2Id)
+        AND p.faction IS NOT NULL AND TRIM(p.faction)<>''
+      GROUP BY p.faction
+    )
+    SELECT ps.faction,ps.players,COALESCE(ws.wins,0) AS wins,COALESCE(ls.losses,0) AS losses,
+      COALESCE(ws.wins,0) AS ratingWins,COALESCE(ls.losses,0) AS ratingLosses,ps.averageRP,ps.peakRP
+    FROM player_summary ps LEFT JOIN winner_summary ws ON ws.faction=ps.faction
+    LEFT JOIN loser_summary ls ON ls.faction=ps.faction
+    ORDER BY ps.players DESC,ps.faction ASC`).all());
 });
 app.get('/api/tournaments', (_req, res) => {
   res.json(db.prepare(`SELECT tr.id,tr.name,tr.description,tr.imageUrl,tr.type,tr.seasonId,tr.createdAt,tr.seasonNumber,tr.winnerId,tr.winnerName,tm.name AS winnerTeamName,s.name AS seasonName FROM Tournament tr LEFT JOIN Team tm ON tm.id=tr.winnerId LEFT JOIN Season s ON s.id=tr.seasonId ORDER BY tr.createdAt DESC`).all());

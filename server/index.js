@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const crypto = require('node:crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -295,8 +296,6 @@ app.get('/api/simulations', (_req, res) => {
   res.json(db.prepare(`SELECT id,createdAt,input,result FROM Simulation ORDER BY createdAt DESC LIMIT 100`).all());
 });
 
-
-const crypto = require('node:crypto');
 
 // Ranked-match mechanics are driven by RatingMatch and GameConfig.match_win from the original SQL schema.
 function rankedRules() {

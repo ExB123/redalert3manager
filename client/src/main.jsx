@@ -767,8 +767,8 @@ function RatingMatchesTable({rows,onComplete}) {
         <thead><tr><th>Время</th><th>Игрок 1</th><th>Игрок 2</th><th>Карта</th><th>Статус</th><th>Действия</th></tr></thead>
         <tbody>{displayed.map(match=><tr key={match.id}>
           <td className="ranked-match-date">{formatDate(match.scheduledAt)}</td>
-          <td><div className="ranked-match-player"><span className={'player-faction-dot '+factionDotClass(match.player1Faction)}>●</span><strong>{match.player1||'Неизвестен'}</strong></div><small className="ranked-match-team">{match.player1Team||'Без команды'}</small></td>
-          <td><div className="ranked-match-player"><span className={'player-faction-dot '+factionDotClass(match.player2Faction)}>●</span><strong>{match.player2||'Неизвестен'}</strong></div><small className="ranked-match-team">{match.player2Team||'Без команды'}</small></td>
+          <td><div className="ranked-match-player"><span className={'player-faction-dot '+factionDotClass(match.player1Faction)}>●</span><strong>{match.player1||'Неизвестен'}</strong></div><small className="ranked-match-team">{match.player1Team||'Без команды'}</small>{match.player1RankImageUrl&&<div className="ranked-match-rank"><ImageCell src={match.player1RankImageUrl} alt={match.player1Rank||'Звание'} type="rank"/><small>{match.player1Rank||''}</small></div>}</td>
+          <td><div className="ranked-match-player"><span className={'player-faction-dot '+factionDotClass(match.player2Faction)}>●</span><strong>{match.player2||'Неизвестен'}</strong></div><small className="ranked-match-team">{match.player2Team||'Без команды'}</small>{match.player2RankImageUrl&&<div className="ranked-match-rank"><ImageCell src={match.player2RankImageUrl} alt={match.player2Rank||'Звание'} type="rank"/><small>{match.player2Rank||''}</small></div>}</td>
           <td>{match.map||'—'}</td>
           <td><span className={match.completed?'match-status-completed':'match-status-pending'}>{match.completed?'Завершён':'Ожидается'}</span>{match.completed&&match.winner?<small className="ranked-match-winner">Победил {match.winner}</small>:null}</td>
           <td><div className="ranked-match-row-actions">

@@ -832,7 +832,8 @@ function FactionStatsPanel({rows}) {
     else if(winnerFaction===second)item.secondWins++;
     else item.matches--;
   });
-  const matchups=[...matchupMap.values()].filter(item=>item.matches>0).sort((a,b)=>factionOrder[a.first]-factionOrder[b.first]||factionOrder[a.second]-factionOrder[b.second]);
+  const matchupDisplayOrder={'Альянс|Империя':0,'Империя|Союз':1,'Альянс|Союз':2};
+  const matchups=[...matchupMap.values()].filter(item=>item.matches>0).sort((a,b)=>(matchupDisplayOrder[a.first+'|'+a.second]??99)-(matchupDisplayOrder[b.first+'|'+b.second]??99));
   if(!rows.length) return <div className="empty-state">Статистика фракций пока отсутствует в базе.</div>;
   return <div className="faction-dashboard">
     <section className="faction-overview-section">

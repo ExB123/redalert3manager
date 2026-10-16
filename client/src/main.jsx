@@ -500,6 +500,9 @@ function CurrencyDashboard() {
   const [players,setPlayers] = useState([]);
   const [teams,setTeams] = useState([]);
   const [rules,setRules] = useState({});
+  const [ruleRows,setRuleRows] = useState([]);
+  const [editingRules,setEditingRules] = useState(false);
+  const [ruleValues,setRuleValues] = useState({});
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
   const [details,setDetails] = useState(null);
@@ -516,6 +519,7 @@ function CurrencyDashboard() {
       setPlayers(Array.isArray(body.players)?body.players:[]);
       setTeams(Array.isArray(body.teams)?body.teams:[]);
       setRules(body.rules||{});
+      setRuleRows(Array.isArray(body.configRows)?body.configRows:[]);
     } catch(e) {setError(e.message||'Ошибка загрузки финансовых данных.');}
     finally {setLoading(false);}
   }
@@ -528,6 +532,22 @@ function CurrencyDashboard() {
     setForecast(row.forecastUSD===null||row.forecastUSD===undefined?'':String(row.forecastUSD));
     setMessage('');
   };
+  function openRuleEditor() {
+    setRuleValues(Object.fromEntries(ruleRows.map(row=>[row.key,String(row.value??'0')])));
+    setEditingRules(true);setError('');setMessage('');
+  }
+  async function saveCurrencyRules(event) {
+    event.preventDefault();setSaving(true);setError('');setMessage('');
+    try {
+      const response=await fetch('/api/currency/rules',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({rules:ruleValues})});
+      const body=await response.json();
+      if(!response.ok)throw new Error(body.error||'Не удалось сохранить правила доходов.');
+      setEditingRules(false);
+      await loadCurrency();
+      setMessage('Правила расчёта сохранены.');
+    } catch(e){setError(e.message||'Не удалось сохранить правила расчёта.');}
+    finally{setSaving(false);}
+  }
   async function saveValuation(event) {
     event.preventDefault();
     if(!details||details.kind!=='players')return;
@@ -567,7 +587,7 @@ function CurrencyDashboard() {
       {!(mode==='players'?playerRows:teamRows).length&&<div className="empty-state">Нет записей для отображения.</div>}
     </section>
     <section className="currency-config-card">
-      <div className="currency-table-heading"><div><h3>Правила расчёта доходов</h3><p className="muted">Значения хранятся в GameConfig и доступны для редактирования в разделе «Валюта» настроек параметров.</p></div></div>
+      <div className="currency-table-heading"><div><h3>Правила расчёта доходов</h3><p className="muted">Изменение правил сразу влияет на доходы игроков и команд.</p></div><button className="ranked-secondary" onClick={openRuleEditor}>Изменить правила</button></div>
       <div className="currency-rules-grid">
         <div><span>Победа игрока</span><strong>{money(rules.playerWinReward)}</strong></div>
         <div><span>Доплата капитану</span><strong>{money(rules.captainBonus)}</strong></div>
@@ -576,6 +596,14 @@ function CurrencyDashboard() {
       </div>
       <p className="currency-missing">Призы Champions League и Grand League начисляются по отдельным правилам турниров. Для типов турниров без настроенного приза начисление равно 0, пока не будет добавлено правило в GameConfig. Стоимость игрока и прогноз можно указать в «Аналитике» — они сохраняются в базе.</p>
     </section>
+    {editingRules&&<div className="modal-backdrop" onClick={()=>setEditingRules(false)}><section className="crud-modal currency-rules-modal" onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Правила расчёта доходов">
+      <div className="modal-head"><h2>Правила расчёта доходов</h2><button className="icon-btn" onClick={()=>setEditingRules(false)}><X size={18}/></button></div>
+      <form onSubmit={saveCurrencyRules}>
+        <div className="currency-rule-editor-list">{ruleRows.map(row=><label className="form-field" key={row.key}><span>{row.description||row.key}<small>{row.key}</small></span><input type="number" min="0" step="any" required value={ruleValues[row.key]??''} onChange={e=>setRuleValues(current=>({...current,[row.key]:e.target.value}))}/></label>)}</div>
+        <p className="muted">Доходы от матчей, призовые за турниры и доля команды пересчитываются по этим значениям. Нулевой приз означает, что для такого типа турнира не задано начисление.</p>
+        <div className="modal-actions"><button type="button" className="secondary" onClick={()=>setEditingRules(false)}>Отмена</button><button type="submit" className="primary" disabled={saving}>{saving?'Сохранение…':'Сохранить правила'}</button></div>
+      </form>
+    </section></div>}
     {details&&<div className="modal-backdrop" onClick={()=>setDetails(null)}><section className="crud-modal currency-detail-modal" onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Финансовая аналитика">
       <div className="modal-head"><h2>Аналитика: {details.kind==='players'?details.row.nickname:details.row.name}</h2><button className="icon-btn" onClick={()=>setDetails(null)}><X size={18}/></button></div>
       {details.kind==='players'?<>

@@ -196,19 +196,20 @@ app.post('/api/matches/:id/complete', (req, res) => {
     const loser = homeWon ? away : home;
     const now = new Date().toISOString();
     const result = db.transaction(() => {
-      db.prepare('UPDATE Match SET completed=1,winnerId=?,updatedAt=? WHERE id=? AND completed=0').run(winner.id,now,match.id);
-      db.prepare('UPDATE Team SET wins=wins+1,points=points+?,updatedAt=? WHERE id=?').run(teamPoints,now,winner.id);
-      db.prepare('UPDATE Team SET losses=losses+1,updatedAt=? WHERE id=?').run(now,loser.id);
+      const markedCompleted = db.prepare('UPDATE Match SET completed=1,winnerId=?,updatedAt=? WHERE id=? AND completed=0').run(winner.id,now,match.id);
+      if (markedCompleted.changes !== 1) throw new Error('Этот матч уже завершён; повторное начисление статистики запрещено.');
+      db.prepare('UPDATE Team SET wins=COALESCE(wins,0)+1,points=COALESCE(points,0)+?,updatedAt=? WHERE id=?').run(teamPoints,now,winner.id);
+      db.prepare('UPDATE Team SET losses=COALESCE(losses,0)+1,updatedAt=? WHERE id=?').run(now,loser.id);
       const winningPlayers = db.prepare('SELECT id,rpPoints FROM Player WHERE teamId=?').all(winner.id);
       const losingPlayers = db.prepare('SELECT id FROM Player WHERE teamId=?').all(loser.id);
-      const updateWinner = db.prepare('UPDATE Player SET matchWins=matchWins+1,ratingPoints=MAX(0,ratingPoints+?),rpPoints=rpPoints+?,rpPeak=MAX(rpPeak,rpPoints+?) WHERE id=?');
-      const updateLoser = db.prepare('UPDATE Player SET matchLosses=matchLosses+1,ratingPoints=MAX(0,ratingPoints+?) WHERE id=?');
+      const updateWinner = db.prepare('UPDATE Player SET matchWins=COALESCE(matchWins,0)+1,ratingPoints=MAX(0,COALESCE(ratingPoints,0)+?),rpPoints=COALESCE(rpPoints,0)+?,rpPeak=MAX(COALESCE(rpPeak,0),COALESCE(rpPoints,0)+?) WHERE id=?');
+      const updateLoser = db.prepare('UPDATE Player SET matchLosses=COALESCE(matchLosses,0)+1,ratingPoints=MAX(0,COALESCE(ratingPoints,0)+?) WHERE id=?');
       for (const player of winningPlayers) updateWinner.run(playerMMR,playerPoints,playerPoints,player.id);
       for (const player of losingPlayers) updateLoser.run(playerMMRLoss,player.id);
       let mapId = null;
       if (match.map) mapId = db.prepare('SELECT id FROM Map WHERE name=? COLLATE NOCASE').get(match.map)?.id || null;
-      const updateMapWin = db.prepare('UPDATE MapStat SET wins=wins+1 WHERE id=?');
-      const updateMapLoss = db.prepare('UPDATE MapStat SET losses=losses+1 WHERE id=?');
+      const updateMapWin = db.prepare('UPDATE MapStat SET wins=COALESCE(wins,0)+1 WHERE id=?');
+      const updateMapLoss = db.prepare('UPDATE MapStat SET losses=COALESCE(losses,0)+1 WHERE id=?');
       const insertMapStat = db.prepare('INSERT INTO MapStat (id,mapName,mapId,wins,losses,teamId,playerId,createdAt) VALUES (?,?,?,?,?,?,?,?)');
       const updateStats = (players, won) => {
         if (!match.map) return;

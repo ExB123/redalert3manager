@@ -494,14 +494,16 @@ app.get('/api/simulations', (_req, res) => {
 
 app.get('/api/backups', (_req,res) => {
   try {
-    const rows=db.prepare('SELECT id,createdAt,data FROM BackupLog ORDER BY createdAt DESC LIMIT 100').all();
-    res.json(rows.map(row=>{
-      let parsed=null;
-      try { parsed=JSON.parse(row.data); } catch {}
-      const tables=parsed?.tables && typeof parsed.tables==='object' ? parsed.tables : null;
-      const counts=tables ? Object.fromEntries(Object.entries(tables).map(([name,items])=>[name,Array.isArray(items)?items.length:0])) : {};
-      return {id:row.id,createdAt:row.createdAt,format:parsed?.format||'legacy',restorable:parsed?.format==='ra3-manager-backup'&&parsed?.version===1&&!!tables,tableCount:Object.keys(counts).length,counts};
-    }));
+    // Read only backup metadata here; full JSON snapshots can be several megabytes each.
+    const rows=db.prepare(`SELECT id,createdAt,
+      CASE WHEN json_valid(data) AND json_extract(data,'$.format')='ra3-manager-backup'
+        AND CAST(json_extract(data,'$.version') AS INTEGER)=1 AND json_type(data,'$.tables')='object' THEN 1 ELSE 0 END AS restorable,
+      CASE WHEN json_valid(data) AND json_type(data,'$.tables')='object'
+        THEN (SELECT COUNT(*) FROM json_each(data,'$.tables')) ELSE 0 END AS tableCount,
+      CASE WHEN json_valid(data) AND json_type(data,'$.tables')='object'
+        THEN COALESCE((SELECT SUM(json_array_length(value)) FROM json_each(data,'$.tables') WHERE json_type(value)='array'),0) ELSE 0 END AS rowCount
+      FROM BackupLog ORDER BY createdAt DESC LIMIT 100`).all();
+    res.json(rows.map(row=>({...row,restorable:Boolean(row.restorable)})));
   } catch(error) { res.status(500).json({error:safeErrorMessage(error)}); }
 });
 app.post('/api/backups', (_req,res) => {

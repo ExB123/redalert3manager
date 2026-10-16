@@ -268,3 +268,27 @@ tbody tr:hover{background:#0a1425}
 
 .player-faction-dot{font-size:10px;margin-right:7px;vertical-align:1px}
 .player-ranking-name{white-space:nowrap}
+
+.rating-match-view-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 16px}
+.rating-match-view-tabs button{display:flex;align-items:center;gap:8px;background:#10172b;border:1px solid #26324b;color:#aab7ce;padding:9px 13px;border-radius:8px;cursor:pointer}
+.rating-match-view-tabs button.selected{background:#26334a;color:#fff;border-color:#43536f}
+.rating-match-view-tabs button span{font-size:11px;opacity:.75}
+.ranked-matches-data-table{min-width:940px}
+.ranked-matches-data-table th{white-space:nowrap}
+.ranked-match-date{white-space:nowrap;min-width:135px}
+.ranked-match-player{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.ranked-match-team{display:block;margin:4px 0 0 17px;color:#8c9ab3}
+.ranked-match-row-actions{display:flex;gap:6px;flex-wrap:wrap;min-width:260px}
+.ranked-match-row-actions .ranked-secondary{font-size:11px;padding:7px 9px;white-space:nowrap}
+.match-status-pending{color:#e9bd64}
+.match-status-completed{color:#70d9a0}
+.ranked-match-winner{display:block;margin-top:4px;color:#70d9a0}
+.ranked-match-count-note{margin-top:12px}
+.ranked-match-details{max-width:760px;width:calc(100% - 32px)}
+.ranked-match-detail-versus{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:18px;padding:20px 0}
+.ranked-match-detail-versus>div{background:#111a2d;border:1px solid #27354d;border-radius:10px;padding:16px;min-width:0}
+.ranked-match-detail-versus h3{margin:8px 0 4px;overflow-wrap:anywhere}
+.ranked-match-detail-versus p{margin:5px 0;color:#9aa9c0}
+.ranked-match-detail-versus span{font-size:12px}
+.ranked-match-vs{color:#9aa9c0}
+@media(max-width:720px){.ranked-match-detail-versus{grid-template-columns:1fr}.ranked-match-vs{text-align:center}}

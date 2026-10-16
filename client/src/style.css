@@ -361,3 +361,6 @@ tbody tr:hover{background:#0a1425}
 .ranked-match-rank small{font-size:10px;color:#8d9bb4}
 
 .cabinet-team-label{font-size:10px;color:#a0aec5}
+
+.map-stat-cards-compact{grid-template-columns:minmax(180px,260px);margin:12px 0 18px}
+.map-stat-cards-compact .map-stat-card{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:18px}

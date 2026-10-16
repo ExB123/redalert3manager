@@ -25,8 +25,8 @@ app.get('/api/summary', (_req, res) => res.json({
 
 app.get('/api/teams', (_req, res) => {
   res.json(db.prepare(`SELECT t.id,t.name,t.logoUrl,t.wins,t.losses,t.points,t.level,
-    COALESCE(t.bestMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId WHERE ms.teamId=t.id AND (ms.wins+ms.losses)>0 ORDER BY ms.wins DESC,ms.losses ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS bestMap,
-    COALESCE(t.worstMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId WHERE ms.teamId=t.id AND (ms.wins+ms.losses)>0 ORDER BY ms.losses DESC,ms.wins ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS worstMap
+    COALESCE(t.bestMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId JOIN Player mp ON mp.id=ms.playerId WHERE mp.teamId=t.id AND (ms.wins+ms.losses)>0 ORDER BY ms.wins DESC,ms.losses ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS bestMap,
+    COALESCE(t.worstMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId JOIN Player mp ON mp.id=ms.playerId WHERE mp.teamId=t.id AND (ms.wins+ms.losses)>0 ORDER BY ms.losses DESC,ms.wins ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS worstMap
     FROM Team t ORDER BY t.points DESC, t.wins DESC, t.name ASC`).all());
 });
 app.get('/api/players', (_req, res) => {

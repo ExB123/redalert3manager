@@ -980,7 +980,8 @@ function PlayerCabinet({players,onFindMatch}) {
   };
   const formatDate=value=>value?new Date(value).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
   const recentResult=person=>{
-    const match=playerMatches.filter(item=>Boolean(item.completed)).sort((a,b)=>String(b.scheduledAt||'').localeCompare(String(a.scheduledAt||'')))[0];
+    const personMatches=ratingMatches.filter(item=>(item.player1Id===person.id||item.player2Id===person.id)&&Boolean(item.completed));
+    const match=personMatches.sort((a,b)=>String(b.scheduledAt||'').localeCompare(String(a.scheduledAt||'')))[0];
     if(!match)return null;
     const opponentName=match.player1Id===person.id?match.player2:match.player1;
     return {result:match.winnerId===person.id?'Победа':'Поражение',opponent:opponentName,map:match.map};

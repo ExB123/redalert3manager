@@ -1177,7 +1177,7 @@ function BackupPanel() {
     } catch(e) {setError(e.message||'Не удалось восстановить резервную копию.');}
     finally {setBusy(false);}
   }
-  const rowCount=backup=>Object.values(backup.counts||{}).reduce((sum,count)=>sum+Number(count||0),0);
+  const rowCount=backup=>Number(backup.rowCount||0);
   return <section className="panel backup-panel">
     <div className="panel-head"><div><h2>Резервные копии базы</h2><p className="muted">Полная копия данных приложения: игроки, команды, матчи, рейтинги, турниры, настройки и связанные таблицы.</p></div><button className="primary" onClick={createBackup} disabled={busy}><Save size={16}/>{busy?'Обработка…':'Создать копию'}</button></div>
     {message&&<div className="success-message">{message}</div>}

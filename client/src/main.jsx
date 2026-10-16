@@ -921,7 +921,14 @@ function MapStatsPanel({rows}) {
     const item=acc.get(key);item.wins+=Number(row.wins||0);item.losses+=Number(row.losses||0);
     return acc;
   },new Map());
-  const factionRows=[...factionStats.values()].sort((a,b)=>b.wins-a.wins);
+  const factionDisplayOrder=value=>{
+    const faction=String(value||'').toLowerCase();
+    if(faction.includes('союз')||faction.includes('soviet'))return 0;
+    if(faction.includes('альянс')||faction.includes('allied')||faction.includes('allies'))return 1;
+    if(faction.includes('импер')||faction.includes('empire'))return 2;
+    return 99;
+  };
+  const factionRows=[...factionStats.values()].sort((a,b)=>factionDisplayOrder(a.faction)-factionDisplayOrder(b.faction));
   const completedMapMatches=matchRows.filter(match=>Boolean(match.completed) && String(match.map||'')===selectedMap);
   const homeWins=completedMapMatches.filter(match=>Number(match.homeScore)>Number(match.awayScore)).length;
   const awayWins=completedMapMatches.filter(match=>Number(match.awayScore)>Number(match.homeScore)).length;

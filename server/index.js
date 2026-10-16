@@ -231,14 +231,21 @@ app.post('/api/matches/:id/complete', (req, res) => {
         }
       }
       let tournamentWinnerUpdated = false;
+      let tournamentAwards = [];
       if (match.tournamentId && !match.nextMatchId) {
         const finalRound = db.prepare('SELECT MAX(round) AS maxRound FROM Match WHERE tournamentId=?').get(match.tournamentId)?.maxRound;
         if (finalRound!==null && finalRound!==undefined && Number(match.round)===Number(finalRound)) {
           const updated = db.prepare('UPDATE Tournament SET winnerId=?,winnerName=? WHERE id=?').run(winner.id,winner.name,match.tournamentId);
           tournamentWinnerUpdated = updated.changes>0;
+          if (tournamentWinnerUpdated) {
+            const placements = [[1,winner.id],[2,loser.id]];
+            const thirdPlace = db.prepare('SELECT winnerId FROM Match WHERE tournamentId=? AND completed=1 AND winnerId IS NOT NULL AND nextMatchId IS NULL AND round<? ORDER BY round DESC LIMIT 1').get(match.tournamentId,Number(finalRound));
+            if (thirdPlace?.winnerId && thirdPlace.winnerId!==winner.id && thirdPlace.winnerId!==loser.id) placements.push([3,thirdPlace.winnerId]);
+            tournamentAwards = placements.map(([place,teamId])=>awardTournamentPlacement(match.tournamentId,place,teamId,now)).filter(Boolean);
+          }
         }
       }
-      return { winner:winner.name, loser:loser.name, nextMatchAdvanced:advanced, tournamentWinnerUpdated, winningPlayers:winningPlayers.length, losingPlayers:losingPlayers.length };
+      return { winner:winner.name, loser:loser.name, nextMatchAdvanced:advanced, tournamentWinnerUpdated, tournamentAwards, winningPlayers:winningPlayers.length, losingPlayers:losingPlayers.length };
     })();
     res.json({ ok:true, matchId:match.id, ...result });
   } catch (error) {

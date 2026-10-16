@@ -10,6 +10,27 @@ const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'ra3-ma
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 const db = new Database(dbPath, { fileMustExist: true });
 db.pragma('foreign_keys = ON');
+db.exec(`CREATE TABLE IF NOT EXISTS PlayerFinance (
+  playerId TEXT PRIMARY KEY REFERENCES Player(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  marketValueUSD INTEGER,
+  forecastUSD INTEGER,
+  updatedAt TEXT NOT NULL
+)`);
+const defaultCurrencyRules = [
+  ['currency_player_win_reward','2000','Доход игрока за победу в рейтинговом матче, USD'],
+  ['currency_captain_win_bonus','1000','Доплата капитану за победу в рейтинговом матче, USD'],
+  ['currency_team_win_reward','15000','Доход команды за победу в матче, USD'],
+  ['currency_player_prize_champions_league','198333','Доход игрока за победу команды в Champions League, USD'],
+  ['currency_player_prize_grand_league','187500','Доход игрока за победу команды в Grand League, USD'],
+  ['currency_team_prize_champions_league','2500000','Доход команды за победу в Champions League, USD'],
+  ['currency_team_prize_grand_league','1650000','Доход команды за победу в Grand League, USD'],
+  ['currency_team_prize_astra_league','1600000','Доход команды за победу в Astra League, USD'],
+  ['currency_team_share_percent','20','Доля команды от суммарного дохода игроков, проценты']
+];
+const insertCurrencyRule = db.prepare('INSERT OR IGNORE INTO GameConfig (id,key,value,description,createdAt) VALUES (?,?,?,?,?)');
+for (const [key,value,description] of defaultCurrencyRules) {
+  insertCurrencyRule.run(crypto.randomUUID().replace(/-/g,''),key,value,description,new Date().toISOString());
+}
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -158,6 +179,74 @@ app.get('/api/maps', (_req, res) => {
 });
 app.get('/api/map-stats', (_req, res) => {
   res.json(db.prepare(`SELECT ms.id,ms.mapName,ms.mapId,ms.teamId,ms.playerId,ms.wins,ms.losses,ms.createdAt,t.name AS teamName,p.nickname AS playerName,m.name AS map FROM MapStat ms LEFT JOIN Team t ON t.id=ms.teamId LEFT JOIN Player p ON p.id=ms.playerId LEFT JOIN Map m ON m.id=ms.mapId ORDER BY (ms.wins + ms.losses) DESC, ms.mapName ASC`).all());
+});
+const currencyTypeSlug = value => String(value||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+function currencyRuleNumber(key, fallback = 0) {
+  const row = db.prepare('SELECT value FROM GameConfig WHERE key=?').get(key);
+  if (!row) return fallback;
+  const value = Number(row.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+function currencyTournamentPrize(type, audience) {
+  return currencyRuleNumber('currency_'+audience+'_prize_'+currencyTypeSlug(type),0);
+}
+app.get('/api/currency', (_req,res) => {
+  try {
+    const players = db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.isTeamCaptain,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.ratingPoints,t.name AS teamName
+      FROM Player p LEFT JOIN Team t ON t.id=p.teamId ORDER BY p.rpPoints DESC,p.nickname ASC`).all();
+    const teams = db.prepare('SELECT id,name,wins,losses,points,level,bestMap,worstMap FROM Team ORDER BY points DESC,wins DESC,name ASC').all();
+    const tournaments = db.prepare('SELECT id,name,type,winnerId,winnerName FROM Tournament').all();
+    const finance = new Map(db.prepare('SELECT playerId,marketValueUSD,forecastUSD FROM PlayerFinance').all().map(row=>[row.playerId,row]));
+    const playerWinReward = currencyRuleNumber('currency_player_win_reward',2000);
+    const captainBonus = currencyRuleNumber('currency_captain_win_bonus',1000);
+    const teamWinReward = currencyRuleNumber('currency_team_win_reward',15000);
+    const teamSharePercent = currencyRuleNumber('currency_team_share_percent',20);
+    const playerRows = players.map(player => {
+      const ratingWins = Number(player.ratingWins||0), ratingLosses = Number(player.ratingLosses||0);
+      const matchIncome = ratingWins*(playerWinReward+(player.isTeamCaptain?captainBonus:0));
+      const titles = tournaments.filter(tournament => tournament.winnerId===player.teamId || (!tournament.winnerId && tournament.winnerName===player.teamName));
+      const tournamentIncome = titles.reduce((sum,tournament)=>sum+currencyTournamentPrize(tournament.type,'player'),0);
+      const market = finance.get(player.id);
+      return {...player,ratingGames:ratingWins+ratingLosses,matchIncome,tournamentIncome,totalIncome:matchIncome+tournamentIncome,
+        marketValueUSD:market?.marketValueUSD??null,forecastUSD:market?.forecastUSD??null,
+        tournamentTitles:titles.map(tournament=>({id:tournament.id,name:tournament.name,type:tournament.type,prizeUSD:currencyTournamentPrize(tournament.type,'player')}))};
+    });
+    const playerById = new Map(playerRows.map(player=>[player.id,player]));
+    const teamRows = teams.map(team => {
+      const roster = playerRows.filter(player=>player.teamId===team.id);
+      const titles = tournaments.filter(tournament=>tournament.winnerId===team.id||(!tournament.winnerId&&tournament.winnerName===team.name));
+      const matchIncome = Number(team.wins||0)*teamWinReward;
+      const tournamentIncome = titles.reduce((sum,tournament)=>sum+currencyTournamentPrize(tournament.type,'team'),0);
+      const playersIncome = roster.reduce((sum,player)=>sum+player.totalIncome,0);
+      const shareIncome = Math.round(playersIncome*teamSharePercent/100);
+      const hasAllValues = roster.length>0 && roster.every(player=>player.marketValueUSD!==null);
+      const hasAllForecasts = roster.length>0 && roster.every(player=>player.forecastUSD!==null);
+      return {...team,playerCount:roster.length,matchIncome,tournamentIncome,shareIncome,totalIncome:matchIncome+tournamentIncome+shareIncome,
+        marketValueUSD:hasAllValues?roster.reduce((sum,player)=>sum+Number(player.marketValueUSD),0):null,
+        forecastUSD:hasAllForecasts?roster.reduce((sum,player)=>sum+Number(player.forecastUSD),0):null,
+        tournamentTitles:titles.map(tournament=>({id:tournament.id,name:tournament.name,type:tournament.type,prizeUSD:currencyTournamentPrize(tournament.type,'team')})),
+        players:roster.map(player=>({id:player.id,nickname:player.nickname,totalIncome:player.totalIncome,marketValueUSD:player.marketValueUSD,forecastUSD:player.forecastUSD}))};
+    });
+    res.json({players:playerRows,teams:teamRows,rules:{playerWinReward,captainBonus,teamWinReward,teamSharePercent}});
+  } catch(error) { res.status(500).json({error:safeErrorMessage(error)}); }
+});
+app.put('/api/currency/players/:id', (req,res) => {
+  try {
+    const player=db.prepare('SELECT id FROM Player WHERE id=?').get(req.params.id);
+    if(!player)return res.status(404).json({error:'Игрок не найден.'});
+    const parseMoney=(value,label)=>{
+      if(value===null||value===undefined||value==='')return null;
+      const number=Number(value);
+      if(!Number.isFinite(number)||number<0||!Number.isSafeInteger(Math.round(number)))throw new Error(label+' должно быть неотрицательным числом.');
+      return Math.round(number);
+    };
+    const marketValueUSD=parseMoney(req.body?.marketValueUSD,'Стоимость игрока');
+    const forecastUSD=parseMoney(req.body?.forecastUSD,'Прогноз');
+    const updatedAt=new Date().toISOString();
+    db.prepare('INSERT INTO PlayerFinance (playerId,marketValueUSD,forecastUSD,updatedAt) VALUES (?,?,?,?) ON CONFLICT(playerId) DO UPDATE SET marketValueUSD=excluded.marketValueUSD,forecastUSD=excluded.forecastUSD,updatedAt=excluded.updatedAt')
+      .run(player.id,marketValueUSD,forecastUSD,updatedAt);
+    res.json({ok:true,playerId:player.id,marketValueUSD,forecastUSD,updatedAt});
+  } catch(error) { res.status(400).json({error:safeErrorMessage(error)}); }
 });
 app.get('/api/config', (_req, res) => {
   res.json(db.prepare(`SELECT id,key,value,description,createdAt FROM GameConfig ORDER BY key ASC`).all());

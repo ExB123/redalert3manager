@@ -999,7 +999,7 @@ function PlayerCabinet({players,onFindMatch}) {
   const mainLast=recentResult(player);
   const opponentLast=opponent?recentResult(opponent):null;
   const matchCard=(person,matchPlayerName,label,last)=>person?<article className="cabinet-upcoming-player">
-    <div className="cabinet-upcoming-player-head"><ImageCell src={person.rankImageUrl} alt={person.rankName||'Звание'} type="rank"/><div><small>{label}</small><strong>{person.nickname}</strong><span className="cabinet-rank-label">{person.rankName||'Звание не назначено'}</span></div></div>
+    <div className="cabinet-upcoming-player-head"><ImageCell src={person.rankImageUrl} alt={person.rankName||'Звание'} type="rank"/><div><small>{label}</small><strong>{person.nickname}</strong><small className="cabinet-team-label">{person.teamName||'Без команды'}</small><span className="cabinet-rank-label">{person.rankName||'Звание не назначено'}</span></div></div>
     <p className="cabinet-faction-line"><span className={'player-faction-dot '+factionClass(person.faction)}>●</span><FactionName value={person.faction}/></p>
     <div className="cabinet-upcoming-player-stats"><div><span>RP</span><strong>{person.rpPoints??0}</strong></div><div><span>Рейтинговые игры</span><strong>{Number(person.ratingWins||0)+Number(person.ratingLosses||0)}</strong></div><div><span>Победы/поражения</span><strong>{person.ratingWins??0} / {person.ratingLosses??0}</strong></div></div>
     {last&&<p className={'cabinet-last-result '+(last.result==='Победа'?'win':'loss')}>Последний матч: {last.result} {last.opponent?'против '+last.opponent:''}{last.map?' (карта: '+last.map+')':''}</p>}

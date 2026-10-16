@@ -188,6 +188,12 @@ function currencyRuleNumber(key, fallback = 0) {
   const value = Number(row.value);
   return Number.isFinite(value) ? value : fallback;
 }
+function currencyEffectiveTournamentType(tournament) {
+  const name=String(tournament?.name||'').toLowerCase();
+  const known=['Champions League','Grand League','Astra League','Ultimate League','FFA League','Outsiders League'];
+  const fromName=known.find(type=>name.startsWith(type.toLowerCase()));
+  return fromName||tournament?.type||'';
+}
 function currencyTournamentPrize(type, audience) {
   return currencyRuleNumber('currency_'+audience+'_prize_'+currencyTypeSlug(type),0);
 }
@@ -206,7 +212,7 @@ app.get('/api/currency', (_req,res) => {
       const ratingWins = Number(player.ratingWins||0), ratingLosses = Number(player.ratingLosses||0);
       const matchIncome = ratingWins*(playerWinReward+(player.isTeamCaptain?captainBonus:0));
       const titles = tournaments.filter(tournament => tournament.winnerId===player.teamId || (!tournament.winnerId && tournament.winnerName===player.teamName));
-      const tournamentIncome = titles.reduce((sum,tournament)=>sum+currencyTournamentPrize(tournament.type,'player'),0);
+      const tournamentIncome = titles.reduce((sum,tournament)=>sum+currencyTournamentPrize(currencyEffectiveTournamentType(tournament),'player'),0);
       const market = finance.get(player.id);
       return {...player,ratingGames:ratingWins+ratingLosses,matchIncome,tournamentIncome,totalIncome:matchIncome+tournamentIncome,
         marketValueUSD:market?.marketValueUSD??null,forecastUSD:market?.forecastUSD??null,
@@ -217,7 +223,7 @@ app.get('/api/currency', (_req,res) => {
       const roster = playerRows.filter(player=>player.teamId===team.id);
       const titles = tournaments.filter(tournament=>tournament.winnerId===team.id||(!tournament.winnerId&&tournament.winnerName===team.name));
       const matchIncome = Number(team.wins||0)*teamWinReward;
-      const tournamentIncome = titles.reduce((sum,tournament)=>sum+currencyTournamentPrize(tournament.type,'team'),0);
+      const tournamentIncome = titles.reduce((sum,tournament)=>sum+currencyTournamentPrize(currencyEffectiveTournamentType(tournament),'team'),0);
       const playersIncome = roster.reduce((sum,player)=>sum+player.totalIncome,0);
       const shareIncome = Math.round(playersIncome*teamSharePercent/100);
       const hasAllValues = roster.length>0 && roster.every(player=>player.marketValueUSD!==null);

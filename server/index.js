@@ -26,7 +26,14 @@ const defaultCurrencyRules = [
   ['currency_team_prize_champions_league','2500000','Доход команды за победу в Champions League, USD'],
   ['currency_team_prize_grand_league','1650000','Доход команды за победу в Grand League, USD'],
   ['currency_team_prize_astra_league','1600000','Доход команды за победу в Astra League, USD'],
-  ['currency_team_share_percent','20','Доля команды от суммарного дохода игроков, проценты']
+  ['currency_team_share_percent','20','Доля команды от суммарного дохода игроков, проценты'],
+  ['currency_player_prize_astra_league','0','Доход игрока за победу команды в Astra League, USD (не подтверждён исходными правилами)'],
+  ['currency_player_prize_ultimate_league','0','Доход игрока за победу команды в Ultimate League, USD (не подтверждён исходными правилами)'],
+  ['currency_player_prize_ffa_league','0','Доход игрока за победу команды в FFA League, USD (не подтверждён исходными правилами)'],
+  ['currency_player_prize_outsiders_league','0','Доход игрока за победу команды в Outsiders League, USD (не подтверждён исходными правилами)'],
+  ['currency_team_prize_ultimate_league','0','Доход команды за победу в Ultimate League, USD (не подтверждён исходными правилами)'],
+  ['currency_team_prize_ffa_league','0','Доход команды за победу в FFA League, USD (не подтверждён исходными правилами)'],
+  ['currency_team_prize_outsiders_league','0','Доход команды за победу в Outsiders League, USD (не подтверждён исходными правилами)']
 ];
 const insertCurrencyRule = db.prepare('INSERT OR IGNORE INTO GameConfig (id,key,value,description,createdAt) VALUES (?,?,?,?,?)');
 for (const [key,value,description] of defaultCurrencyRules) {

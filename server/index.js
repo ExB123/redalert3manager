@@ -24,10 +24,18 @@ app.get('/api/summary', (_req, res) => res.json({
 }));
 
 app.get('/api/teams', (_req, res) => {
-  res.json(db.prepare(`SELECT id,name,logoUrl,wins,losses,points,level,bestMap,worstMap FROM Team ORDER BY points DESC, wins DESC, name ASC`).all());
+  res.json(db.prepare(`SELECT t.id,t.name,t.logoUrl,t.wins,t.losses,t.points,t.level,
+    COALESCE(t.bestMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId WHERE ms.teamId=t.id AND (ms.wins+ms.losses)>0 ORDER BY ms.wins DESC,ms.losses ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS bestMap,
+    COALESCE(t.worstMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId WHERE ms.teamId=t.id AND (ms.wins+ms.losses)>0 ORDER BY ms.losses DESC,ms.wins ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS worstMap
+    FROM Team t ORDER BY t.points DESC, t.wins DESC, t.name ASC`).all());
 });
 app.get('/api/players', (_req, res) => {
-  res.json(db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.experience,p.wins,p.ratingPoints,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.rpPeak,p.position,p.isTeamCaptain,p.rankId,p.bestMap,p.worstMap,p.matchWins,p.matchLosses,t.name AS teamName,r.name AS rankName,r.imageUrl AS rankImageUrl FROM Player p LEFT JOIN Team t ON t.id=p.teamId LEFT JOIN Rank r ON r.id=p.rankId ORDER BY p.rpPoints DESC, p.ratingPoints DESC, p.nickname ASC`).all());
+  res.json(db.prepare(`SELECT p.id,p.nickname,p.faction,p.teamId,p.experience,p.wins,p.ratingPoints,p.ratingGames,p.ratingWins,p.ratingLosses,p.rpPoints,p.rpPeak,p.position,p.isTeamCaptain,p.rankId,
+    COALESCE(p.bestMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId WHERE ms.playerId=p.id AND (ms.wins+ms.losses)>0 ORDER BY ms.wins DESC,ms.losses ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS bestMap,
+    COALESCE(p.worstMap,(SELECT COALESCE(m.name,ms.mapName) FROM MapStat ms LEFT JOIN Map m ON m.id=ms.mapId WHERE ms.playerId=p.id AND (ms.wins+ms.losses)>0 ORDER BY ms.losses DESC,ms.wins ASC,COALESCE(m.name,ms.mapName) ASC LIMIT 1)) AS worstMap,
+    p.matchWins,p.matchLosses,t.name AS teamName,r.name AS rankName,r.imageUrl AS rankImageUrl
+    FROM Player p LEFT JOIN Team t ON t.id=p.teamId LEFT JOIN Rank r ON r.id=p.rankId
+    ORDER BY p.rpPoints DESC, p.ratingPoints DESC, p.nickname ASC`).all());
 });
 app.get('/api/faction-stats', (_req, res) => {
   res.json(db.prepare(`SELECT faction,COUNT(*) AS players,SUM(COALESCE(matchWins,0)) AS wins,SUM(COALESCE(matchLosses,0)) AS losses,SUM(COALESCE(ratingWins,0)) AS ratingWins,SUM(COALESCE(ratingLosses,0)) AS ratingLosses,ROUND(AVG(COALESCE(rpPoints,0)),1) AS averageRP,MAX(COALESCE(rpPeak,0)) AS peakRP FROM Player WHERE faction IS NOT NULL AND TRIM(faction) <> '' GROUP BY faction ORDER BY players DESC,faction ASC`).all());

@@ -324,3 +324,29 @@ tbody tr:hover{background:#0a1425}
 .faction-winrate-values span:first-child{color:#45d99a}
 .faction-winrate-values span:last-child{color:#ff646c}
 @media(max-width:900px){.faction-winrate-grid{grid-template-columns:1fr}}
+
+.cabinet-match-sections{grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);align-items:start}
+.cabinet-next-match-card{min-height:100%}
+.cabinet-next-match-meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin:8px 0 14px;color:#a8b5ca;font-size:12px}
+.cabinet-next-match-meta strong{color:#e5edf9}
+.cabinet-upcoming-versus{display:grid;grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr);align-items:stretch;gap:10px}
+.cabinet-upcoming-player{min-width:0;padding:14px;border:1px solid #26344c;border-radius:9px;background:#050b19}
+.cabinet-upcoming-player-head{display:flex;align-items:center;gap:10px}
+.cabinet-upcoming-player-head .image-cell{width:48px;height:48px;flex-basis:48px;flex-shrink:0}
+.cabinet-upcoming-player-head>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.cabinet-upcoming-player-head small{font-size:10px;color:#a0aec5}
+.cabinet-upcoming-player-head strong{font-size:13px;overflow-wrap:anywhere}
+.cabinet-rank-label{font-size:10px;color:#a0aec5}
+.cabinet-faction-line{display:flex;align-items:center;gap:5px;margin:12px 0}
+.cabinet-upcoming-player-stats{display:grid;grid-template-columns:1fr;gap:8px}
+.cabinet-upcoming-player-stats>div{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #1e2b41;padding-top:7px;font-size:11px}
+.cabinet-upcoming-player-stats span{color:#9aa9c0}
+.cabinet-last-result{font-size:10px;line-height:1.5;margin:12px 0 0}
+.cabinet-last-result.win{color:#35d79a}
+.cabinet-last-result.loss{color:#ff626b}
+.cabinet-versus-label{align-self:center;text-align:center;color:#9ba9bf;font-weight:700;font-size:11px}
+.cabinet-history-table{min-width:300px}
+.cabinet-history-table td,.cabinet-history-table th{padding:10px 8px;font-size:11px}
+.cabinet-history-card .cabinet-match-head{margin-bottom:12px}
+.cabinet-no-opponent{display:flex;flex-direction:column;justify-content:center}
+@media(max-width:900px){.cabinet-match-sections{grid-template-columns:1fr}.cabinet-upcoming-versus{grid-template-columns:minmax(0,1fr)}.cabinet-versus-label{padding:4px}}

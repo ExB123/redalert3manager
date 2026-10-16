@@ -833,6 +833,16 @@ function tableColumns(table) {
   if (!columnCache.has(table)) columnCache.set(table, new Set(db.prepare(`PRAGMA table_info("${table}")`).all().map(x => x.name)));
   return columnCache.get(table);
 }
+function recalculatePlayerRank(playerId) {
+  const player=db.prepare('SELECT id,COALESCE(wins,0) AS wins,COALESCE(experience,0) AS experience,rankId FROM Player WHERE id=?').get(playerId);
+  if(!player||!tableColumns('Rank').has('requiredWins')||!tableColumns('Rank').has('requiredXP'))return null;
+  const rank=db.prepare('SELECT id FROM Rank WHERE COALESCE(requiredWins,0)<=? AND COALESCE(requiredXP,0)<=? ORDER BY requiredXP DESC,requiredWins DESC,name COLLATE NOCASE LIMIT 1').get(player.wins,player.experience);
+  if(rank&&rank.id!==player.rankId)db.prepare('UPDATE Player SET rankId=? WHERE id=?').run(rank.id,player.id);
+  return rank?.id||null;
+}
+function recalculateAllPlayerRanks() {
+  for(const player of db.prepare('SELECT id FROM Player').all())recalculatePlayerRank(player.id);
+}
 function normalizeField(field, value) {
   if (value === '' && !['name','nickname','faction','title','content','key','value','type','scheduledAt'].includes(field)) return null;
   if (['wins','losses','points','level','experience','ratingPoints','ratingGames','ratingWins','ratingLosses','rpPoints','rpPeak','matchWins','matchLosses','homeScore','awayScore','round','playersCount','requiredWins','requiredXP','requiredPoints','orderIndex'].includes(field)) {
@@ -885,6 +895,8 @@ app.post('/api/manage/:entity', (req, res) => {
     const keys = Object.keys(row).filter(key => row[key] !== undefined);
     const sql = `INSERT INTO "${entity.table}" (${keys.map(key => '"' + key + '"').join(',')}) VALUES (${keys.map(() => '?').join(',')})`;
     db.prepare(sql).run(...keys.map(key => row[key]));
+    if(entity.table==='Player'&&!body.rankId)recalculatePlayerRank(row.id);
+    if(entity.table==='Rank')recalculateAllPlayerRanks();
     const saved = db.prepare(`SELECT * FROM "${entity.table}" WHERE id = ?`).get(row.id);
     res.status(201).json(saved);
   } catch (error) {
@@ -920,6 +932,8 @@ app.put('/api/manage/:entity/:id', (req, res) => {
     if (tableColumns(entity.table).has('updatedAt')) row.updatedAt = new Date().toISOString();
     const keys = Object.keys(row).filter(key => row[key] !== undefined);
     db.prepare(`UPDATE "${entity.table}" SET ${keys.map(key => '"' + key + '" = ?').join(',')} WHERE id = ?`).run(...keys.map(key => row[key]), req.params.id);
+    if(entity.table==='Player'&&(fields.includes('experience')||fields.includes('wins')))recalculatePlayerRank(req.params.id);
+    if(entity.table==='Rank')recalculateAllPlayerRanks();
     res.json(db.prepare(`SELECT * FROM "${entity.table}" WHERE id = ?`).get(req.params.id));
   } catch (error) {
     res.status(400).json({ error: safeErrorMessage(error) });
@@ -933,6 +947,7 @@ app.delete('/api/manage/:entity/:id', (req, res) => {
     if (entity.table === 'RatingMatch' && db.prepare('SELECT completed FROM RatingMatch WHERE id=?').get(req.params.id)?.completed) return res.status(409).json({ error: 'Завершённый рейтинговый матч нельзя удалить: его результат уже учтён в рейтингах и статистике.' });
     const result = db.prepare(`DELETE FROM "${entity.table}" WHERE id = ?`).run(req.params.id);
     if (!result.changes) return res.status(404).json({ error: 'Запись не найдена.' });
+    if(entity.table==='Rank')recalculateAllPlayerRanks();
     res.json({ ok: true, deletedId: req.params.id });
   } catch (error) {
     res.status(409).json({ error: safeErrorMessage(error) });

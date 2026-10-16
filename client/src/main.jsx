@@ -1205,6 +1205,7 @@ function MailPanel({rows,onChanged}) {
     const query=search.trim().toLowerCase();
     return !query||String(row.subject||'').toLowerCase().includes(query)||String(row.body||'').toLowerCase().includes(query)||String(row.kind||'').toLowerCase().includes(query);
   });
+  async function refresh() { await onChanged?.(); }
   async function openMessage(row) {
     setSelectedId(row.id);setError('');setMessage('');
     if(!row.isRead) {
@@ -1212,7 +1213,7 @@ function MailPanel({rows,onChanged}) {
         const response=await fetch('/api/mail/'+encodeURIComponent(row.id)+'/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({isRead:true})});
         const body=await response.json();
         if(!response.ok)throw new Error(body.error||'Не удалось отметить сообщение прочитанным.');
-        await onChanged?.();
+        await refresh();
       } catch(e) {setError(e.message||'Не удалось обновить сообщение.');}
     }
   }
@@ -1222,8 +1223,7 @@ function MailPanel({rows,onChanged}) {
       const response=await fetch('/api/mail/'+encodeURIComponent(row.id)+'/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({isRead})});
       const body=await response.json();
       if(!response.ok)throw new Error(body.error||'Не удалось изменить статус сообщения.');
-      await onChanged?.();
-      setMessage(isRead?'Сообщение отмечено прочитанным.':'Сообщение отмечено непрочитанным.');
+      await refresh();setMessage(isRead?'Сообщение отмечено прочитанным.':'Сообщение отмечено непрочитанным.');
     } catch(e) {setError(e.message||'Не удалось изменить статус сообщения.');}
     finally {setBusy(false);}
   }
@@ -1236,85 +1236,13 @@ function MailPanel({rows,onChanged}) {
       const body=await response.json();
       if(!response.ok)throw new Error(body.error||'Не удалось ответить на предложение.');
       setMessage(action==='accept'?(body.acceptedTeam?'Предложение принято. Игрок переведён в команду '+body.acceptedTeam+'.':'Предложение принято.'):'Предложение отклонено.');
-      await onChanged?.();
+      await refresh();
     } catch(e) {setError(e.message||'Не удалось ответить на предложение.');}
     finally {setBusy(false);}
   }
-  const money=value=>value===null||value===undefined||value===''?'—':new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(Number(value))+' 
-  const normalized = String(value || '').trim().toLowerCase();
-  const factionClass = normalized.includes('союз') || normalized.includes('soviet') ? 'faction-red'
-    : normalized.includes('альянс') || normalized.includes('allied') || normalized.includes('allies') ? 'faction-blue'
-    : normalized.includes('импер') || normalized.includes('empire') ? 'faction-yellow' : 'faction-neutral';
-  return <span className={'faction-name '+factionClass}>{value || 'Не указана'}</span>;
-}
-
-function ImageCell({src,alt,type='team'}) {
-  const [failed,setFailed] = useState(!src);
-  useEffect(() => { setFailed(!src); }, [src]);
-  const label = String(alt || '').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase() || (type==='rank'?'★':type==='league'?'L':'?');
-  return <span className={'image-cell image-'+type} title={alt || ''}>
-    {!failed && src ? <img src={src} alt={alt || ''} loading="lazy" onError={() => setFailed(true)}/> : <span className="image-fallback">{label}</span>}
-  </span>;
-}
-
-function configKeyLabel(key) {
-  const labels = {match_win:'Правила начисления за победу',main_player_id:'Основной игрок для рейтинговой лиги'};
-  if(labels[key]) return labels[key];
-  return String(key||'Параметр').replace(/[_-]+/g,' ').replace(/([a-zа-я])([A-ZА-Я])/g,'$1 $2').replace(/^./,char=>char.toLocaleUpperCase('ru'));
-}
-function configValueType(value) {
-  if(value===null || value===undefined || value==='') return 'Пустое';
-  const raw=String(value).trim();
-  if((raw.startsWith('{')&&raw.endsWith('}'))||(raw.startsWith('[')&&raw.endsWith(']'))) {
-    try { JSON.parse(raw); return 'JSON'; } catch {}
-  }
-  if(raw==='true'||raw==='false') return 'Логический';
-  if(Number.isFinite(Number(raw))&&raw!=='') return 'Числовой';
-  return 'Текстовый';
-}
-function emptyMessage(page, subtab) {
-  if (page==='info' && subtab==='Информация') return 'Новостей пока нет — таблица News в исходной базе пустая.';
-  if (page==='info' && subtab==='Медали') return 'Медалей пока нет — таблица Medal в исходной базе пустая.';
-  if (page==='info' && subtab==='Достижения') return 'Достижения не найдены.';
-  if (page==='info' && subtab==='Посты победителей') return 'Постов победителей пока нет.';
-  if (page==='info' && subtab==='Витрина достижений') return 'Витрина достижений пока пуста.';
-  if (page==='simulator') return 'История симуляций не найдена.';
-  return 'В этой таблице пока нет записей.';
-}
-function Toolbar({search,setSearch,sort,setSort,showSort=false}) {
-  return <div className="toolbar"><div className="search"><Search size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск…"/></div>{showSort&&<select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Сортировка"><option value="points">Сортировка: по очкам</option><option value="wins">Сортировка: по победам</option><option value="level">Сортировка: по уровню</option></select>}</div>;
-}
-function DataTable({rows,columns,empty,onEdit,onDelete,canEdit,canDelete,onComplete,canComplete,sortColumn,sortDirection,onSort,podium=false}) {
-  const sortedRows = useMemo(() => {
-    if (sortColumn == null || !columns?.[sortColumn]) return rows || [];
-    const column = columns[sortColumn];
-    return [...(rows || [])].sort((a,b) => {
-      const result = compareSortValues(sortValueForColumn(a,column,0),sortValueForColumn(b,column,0));
-      return sortDirection === 'desc' ? -result : result;
-    });
-  }, [rows,columns,sortColumn,sortDirection]);
-  if (!columns?.length) return <div className="empty-state">Этот экран пока не подключён.</div>;
-  if (!sortedRows.length) return <div className="empty-state">{empty}</div>;
-  return <div className="table-wrap"><table><thead><tr>{columns.map(([label],i)=><th key={i}><button type="button" className="sortable-header" onClick={()=>onSort?.(i)} title={'Сортировать: '+label}>{label}<span aria-hidden="true">{sortColumn===i?(sortDirection==='asc'?' ↑':' ↓'):' ↕'}</span></button></th>)}{(onEdit || onDelete || onComplete) && <th>Действия</th>}</tr></thead><tbody>{sortedRows.map((r,i)=><tr key={r.id||i} className={podium && (r._podiumRank ?? i)<3 ? 'podium p'+(r._podiumRank ?? i) : undefined}>{columns.map(([label,render],j)=><td key={j}>{typeof render==='function'?fmt(render(r,i)):fmt(r[render])}</td>)}{(onEdit || onDelete || onComplete) && <td><div className="row-actions">{onEdit && (!canEdit || canEdit(r)) && <button className="icon-btn" title="Редактировать" onClick={() => onEdit(r)}><Pencil size={15}/></button>}{onDelete && (!canDelete || canDelete(r)) && <button className="icon-btn danger-btn" title="Удалить" onClick={() => onDelete(r)}><Trash2 size={15}/></button>}{onComplete && !r.completed && <button className="icon-btn complete-btn" title={canComplete && !canComplete(r)?'Сначала укажите две команды и неравный счёт':'Завершить матч'} disabled={Boolean(canComplete && !canComplete(r))} onClick={() => onComplete(r)}><CheckCircle2 size={15}/></button>}{onEdit && canEdit && !canEdit(r) && <span className="locked-row">Зафиксирован</span>}</div></td>}</tr>)}</tbody></table></div>;
-}
-function columnsFor(page, subtab) {
-  const map = {
-    teams:[['Логотип',r=><ImageCell src={r.logoUrl} alt={r.name} type="team"/>],['Команда','name'],['Очки','points'],['Победы','wins'],['Поражения','losses'],['Уровень','level'],['Лучшая карта','bestMap'],['Худшая карта','worstMap']],
-    players:[['Игрок','nickname'],['Фракция',r=><FactionName value={r.faction}/>],['Команда','teamName'],['Опыт','experience'],['Победы в матчах','matchWins'],['RP','rpPoints'],['Пиковый RP','rpPeak'],['Звание',r=><span className="rank-cell"><ImageCell src={r.rankImageUrl} alt={r.rankName} type="rank"/>{fmt(r.rankName)}</span>]],
-    tournaments:[['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="league"/>],['Турнир','name'],['Тип','type'],['Сезон',r=>r.seasonName || r.seasonNumber],['Победитель',r=>r.winnerTeamName || r.winnerName],['Создан','createdAt']],
-    matches:[['Турнир','tournamentName'],['Команда 1','homeTeam'],['Счёт',r=>fmt(r.homeScore)+' : '+fmt(r.awayScore)],['Команда 2','awayTeam'],['Победитель','winnerName'],['Карта','map'],['Раунд','round'],['Завершён',r=>bool(r.completed)]],
-    seasons:[['Сезон','name'],['Начало','startDate'],['Конец','endDate'],['Активен',r=>bool(r.isActive)]],
-    maps:subtab==='Статистика карт'?[['Карта',r=>r.map||r.mapName],['Команда','teamName'],['Игрок','playerName'],['Победы','wins'],['Поражения','losses']]:[['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="map"/>],['Карта','name'],['Игроков','playersCount'],['Описание','description']],
-    config:[['Параметр',r=>configKeyLabel(r.key)],['Тип',r=>configValueType(r.value)],['Значение','value'],['Описание','description']],
-    ranks:[['Эмблема',r=><ImageCell src={r.imageUrl} alt={r.name} type="rank"/>],['Звание','name'],['Описание','description'],['Победы для получения','requiredWins'],['Опыт для получения','requiredXP']],
-    simulator:[['Дата','createdAt'],['Турнир',r=>{try{return JSON.parse(r.input).tournamentName || '—';}catch{return '—';}}],['Команды',r=>{try{const x=JSON.parse(r.input);return (x.team1 || '?')+' — '+(x.team2 || '?');}catch{return r.input;}}],['Карта',r=>{try{return JSON.parse(r.result).map || '—';}catch{return '—';}}],['Победитель',r=>{try{return JSON.parse(r.result).winner || '—';}catch{return r.result;}}]]
-  };
-  return map[page] || [];
-}
-createRoot(document.getElementById('root')).render(<App/>);
-;
-  const meta=selected?.meta&&typeof selected.meta==='object'?selected.meta:{};
-  const responseStatus=meta.response?.status;
+  const money=value=>value===null||value===undefined||value===''?'—':new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(Number(value))+' $';
+  const meta=selected&&selected.meta&&typeof selected.meta==='object'?selected.meta:{};
+  const responseStatus=meta.response&&meta.response.status;
   return <div className="mail-workspace">
     <section className="panel mail-toolbar-panel">
       <div className="mail-summary"><div><h2>Почта игрока</h2><p className="muted">Входящие сообщения, трансферные и партнёрские предложения из базы.</p></div><div className="mail-counts"><strong>{rows.length}</strong><span>всего</span><strong>{unreadCount}</strong><span>непрочитано</span></div></div>
@@ -1331,10 +1259,9 @@ createRoot(document.getElementById('root')).render(<App/>);
         <div className="mail-list-heading"><h3>Входящие</h3><span>{filtered.length}</span></div>
         <div className="mail-list-scroll">{filtered.map(row=><button type="button" key={row.id} className={'mail-list-item '+(!row.isRead?'unread ':'')+(selectedId===row.id?' active':'')} onClick={()=>openMessage(row)}>
           <span className={'mail-type-icon mail-kind-'+row.kind}><MailIcon size={16}/></span>
-          <span className="mail-list-copy"><strong>{row.subject}</strong><span>{String(row.body||'').replace(/\s+/g,' ').slice(0,100)}</span><small>{row.createdAt?new Date(row.createdAt).toLocaleString('ru-RU'):'—'} · {typeNames[row.kind]||row.kind}</small></span>
+          <span className="mail-list-copy"><strong>{row.subject}</strong><span>{String(row.body||'').split(String.fromCharCode(10)).join(' ').slice(0,100)}</span><small>{row.createdAt?new Date(row.createdAt).toLocaleString('ru-RU'):'—'} · {typeNames[row.kind]||row.kind}</small></span>
           {!row.isRead&&<span className="mail-unread-dot"/>}
-        </button>)}
-        {!filtered.length&&<p className="muted mail-empty">Сообщения по выбранным фильтрам не найдены.</p>}</div>
+        </button>)}{!filtered.length&&<p className="muted mail-empty">Сообщения по выбранным фильтрам не найдены.</p>}</div>
       </section>
       <section className="panel mail-detail-panel">
         {!selected?<div className="mail-no-selection"><MailIcon size={32}/><h3>Выберите сообщение</h3><p className="muted">Текст и доступные действия появятся здесь.</p></div>:<>
@@ -1342,7 +1269,7 @@ createRoot(document.getElementById('root')).render(<App/>);
           <div className="mail-message-body">{selected.body}</div>
           {selected.kind==='transfer'&&<div className="mail-offer-details"><h3>Условия трансфера</h3><div className="currency-detail-grid"><div><span>Команда</span><strong>{meta.teamName||'—'}</strong></div><div><span>Роль</span><strong>{meta.role||'Игрок'}</strong></div><div><span>Контракт</span><strong>{meta.contractYears?meta.contractYears+' г.':'—'}</strong></div><div><span>Трансферная сумма</span><strong>{money(meta.transferFeeUSD)}</strong></div><div><span>Зарплата в год</span><strong>{money(meta.annualSalaryUSD??(meta.salaryUSD?Number(meta.salaryUSD)*12:null))}</strong></div><div><span>Подписной бонус</span><strong>{money(meta.signingBonusUSD)}</strong></div></div></div>}
           {selected.kind==='cooperation'&&<div className="mail-offer-details"><h3>Условия сотрудничества</h3><div className="currency-detail-grid"><div><span>Компания</span><strong>{meta.company||'—'}</strong></div><div><span>Выплата в месяц</span><strong>{money(meta.amountUSD)}</strong></div><div><span>Срок</span><strong>{meta.durationMonths?meta.durationMonths+' мес.':'—'}</strong></div><div><span>Активности</span><strong>{Array.isArray(meta.perks)?meta.perks.join(', '):'—'}</strong></div></div></div>}
-          {responseStatus&&<div className={'mail-response-status '+(responseStatus==='accepted'?'accepted':'declined')}>{responseStatus==='accepted'?'Предложение принято':'Предложение отклонено'}{meta.response?.respondedAt?' · '+new Date(meta.response.respondedAt).toLocaleString('ru-RU'):''}</div>}
+          {responseStatus&&<div className={'mail-response-status '+(responseStatus==='accepted'?'accepted':'declined')}>{responseStatus==='accepted'?'Предложение принято':'Предложение отклонено'}{meta.response.respondedAt?' · '+new Date(meta.response.respondedAt).toLocaleString('ru-RU'):''}</div>}
           {!responseStatus&&['transfer','cooperation'].includes(selected.kind)&&<div className="mail-actions"><button className="primary" disabled={busy} onClick={()=>respond(selected,'accept')}><CheckCircle2 size={16}/>Принять предложение</button><button className="ranked-secondary" disabled={busy} onClick={()=>respond(selected,'decline')}>Отклонить</button></div>}
         </>}
       </section>

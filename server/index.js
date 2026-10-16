@@ -21,7 +21,7 @@ const defaultCurrencyRules = [
   ['currency_player_win_reward','2000','Доход игрока за победу в рейтинговом матче, USD'],
   ['currency_captain_win_bonus','1000','Доплата капитану за победу в рейтинговом матче, USD'],
   ['currency_team_win_reward','15000','Доход команды за победу в матче, USD'],
-  ['currency_player_prize_champions_league','198333','Доход игрока за победу команды в Champions League, USD'],
+  ['currency_player_prize_champions_league','198333.3333333333','Доход игрока за победу команды в Champions League, USD'],
   ['currency_player_prize_grand_league','187500','Доход игрока за победу команды в Grand League, USD'],
   ['currency_team_prize_champions_league','2500000','Доход команды за победу в Champions League, USD'],
   ['currency_team_prize_grand_league','1650000','Доход команды за победу в Grand League, USD'],
@@ -39,6 +39,7 @@ const insertCurrencyRule = db.prepare('INSERT OR IGNORE INTO GameConfig (id,key,
 for (const [key,value,description] of defaultCurrencyRules) {
   insertCurrencyRule.run(crypto.randomUUID().replace(/-/g,''),key,value,description,new Date().toISOString());
 }
+db.prepare("UPDATE GameConfig SET value='198333.3333333333' WHERE key='currency_player_prize_champions_league' AND value='198333'").run();
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));

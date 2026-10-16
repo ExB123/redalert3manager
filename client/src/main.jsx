@@ -856,7 +856,7 @@ function FactionStatsPanel({rows}) {
     <section className="faction-detail-table panel">
       <h3>Лучшие игроки фракций</h3>
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Фракция</th><th>Игрок</th><th>Команда</th><th>RP</th><th>Звание</th></tr></thead><tbody>
-        {factions.map(faction=>players.filter(player=>normalizeFaction(player.faction)===faction.faction).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,1).map(player=><tr key={faction.faction}><td><FactionName value={faction.faction}/></td><td><span className="player-ranking-name"><span className={'player-faction-dot '+(faction.faction==='Союз'?'faction-red':faction.faction==='Альянс'?'faction-blue':'faction-yellow')}>●</span>{player.nickname}</span></td><td>{player.teamName||'—'}</td><td>{player.rpPoints??0}</td><td>{player.rankName||'—'}</td></tr>)}
+        {factions.map(faction=>players.filter(player=>normalizeFaction(player.faction)===faction.faction).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,1).map(player=><tr key={faction.faction}><td><FactionName value={faction.faction}/></td><td><span className="player-ranking-name"><span className={'player-faction-dot '+(faction.faction==='Союз'?'faction-red':faction.faction==='Альянс'?'faction-blue':'faction-yellow')}>●</span>{player.nickname}</span></td><td>{player.teamName||'—'}</td><td>{player.rpPoints??0}</td><td>{player.rankName||'—'}</td></tr>))}
       </tbody></table></div>
     </section>
     <section className="faction-detail-table panel">

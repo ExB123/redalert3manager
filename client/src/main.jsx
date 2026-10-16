@@ -499,68 +499,121 @@ function CurrencyDashboard() {
   const [mode,setMode] = useState('players');
   const [players,setPlayers] = useState([]);
   const [teams,setTeams] = useState([]);
-  const [config,setConfig] = useState([]);
+  const [rules,setRules] = useState({});
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
   const [details,setDetails] = useState(null);
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      fetch('/api/players').then(async r => { const x = await r.json(); if (!r.ok) throw new Error('Не удалось загрузить игроков'); return x; }),
-      fetch('/api/teams').then(async r => { const x = await r.json(); if (!r.ok) throw new Error('Не удалось загрузить команды'); return x; }),
-      fetch('/api/config').then(async r => { const x = await r.json(); if (!r.ok) throw new Error('Не удалось загрузить параметры экономики'); return x; })
-    ]).then(([p,t,c]) => {
-      if (active) { setPlayers(Array.isArray(p) ? p : []); setTeams(Array.isArray(t) ? t : []); setConfig(Array.isArray(c) ? c : []); }
-    }).catch(e => { if (active) setError(e.message || 'Ошибка загрузки'); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, []);
-  const teamById = new Map(teams.map(team => [team.id, team]));
-  const currencyRules = config.filter(row => /income|cost|forecast|money|currency|econom|доход|стоим|прогноз|валют|деньг|кредит/i.test(String(row.key || '') + ' ' + String(row.description || '')));
-  const unavailable = 'Нет подтверждённых данных';
-  const playerRows = [...players].sort((a,b) => Number(b.rpPoints || 0) - Number(a.rpPoints || 0));
-  const teamRows = [...teams].sort((a,b) => Number(b.points || 0) - Number(a.points || 0) || Number(b.wins || 0) - Number(a.wins || 0));
-  if (loading) return <div className="empty-state">Загрузка финансовых данных…</div>;
+  const [marketValue,setMarketValue] = useState('');
+  const [forecast,setForecast] = useState('');
+  const [saving,setSaving] = useState(false);
+  const [message,setMessage] = useState('');
+  async function loadCurrency() {
+    setLoading(true);setError('');
+    try {
+      const response=await fetch('/api/currency');
+      const body=await response.json();
+      if(!response.ok)throw new Error(body.error||'Не удалось загрузить финансовые данные.');
+      setPlayers(Array.isArray(body.players)?body.players:[]);
+      setTeams(Array.isArray(body.teams)?body.teams:[]);
+      setRules(body.rules||{});
+    } catch(e) {setError(e.message||'Ошибка загрузки финансовых данных.');}
+    finally {setLoading(false);}
+  }
+  useEffect(()=>{loadCurrency();},[]);
+  const money=value=>value===null||value===undefined||value===''?'—':new Intl.NumberFormat('ru-RU',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(value));
+  const shortMoney=value=>value===null||value===undefined||value===''?'Не задано':Number(value)>=1000000?(Number(value)/1000000).toLocaleString('ru-RU',{maximumFractionDigits:2})+' млн $':money(value);
+  const openDetails=(kind,row)=>{
+    setDetails({kind,row});
+    setMarketValue(row.marketValueUSD===null||row.marketValueUSD===undefined?'':String(row.marketValueUSD));
+    setForecast(row.forecastUSD===null||row.forecastUSD===undefined?'':String(row.forecastUSD));
+    setMessage('');
+  };
+  async function saveValuation(event) {
+    event.preventDefault();
+    if(!details||details.kind!=='players')return;
+    setSaving(true);setError('');setMessage('');
+    try {
+      const response=await fetch('/api/currency/players/'+encodeURIComponent(details.row.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({marketValueUSD:marketValue===''?null:Number(marketValue),forecastUSD:forecast===''?null:Number(forecast)})});
+      const body=await response.json();
+      if(!response.ok)throw new Error(body.error||'Не удалось сохранить оценку игрока.');
+      await loadCurrency();
+      setDetails(current=>current?{...current,row:{...current.row,marketValueUSD:body.marketValueUSD,forecastUSD:body.forecastUSD}}:null);
+      setMessage('Стоимость и прогноз сохранены.');
+    } catch(e){setError(e.message||'Не удалось сохранить финансовую оценку.');}
+    finally{setSaving(false);}
+  }
+  if(loading)return <div className="empty-state">Загрузка финансовых данных…</div>;
+  const playerRows=[...players].sort((a,b)=>b.totalIncome-a.totalIncome||b.rpPoints-a.rpPoints);
+  const teamRows=[...teams].sort((a,b)=>b.totalIncome-a.totalIncome||b.points-a.points);
   return <div className="currency-dashboard">
-    <div className="tabs currency-tabs">
-      <button className={mode === 'players' ? 'selected' : ''} onClick={() => setMode('players')}>Игроки</button>
-      <button className={mode === 'teams' ? 'selected' : ''} onClick={() => setMode('teams')}>Команды</button>
-    </div>
-    {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
+    <div className="tabs currency-tabs"><button className={mode==='players'?'selected':''} onClick={()=>setMode('players')}>Игроки</button><button className={mode==='teams'?'selected':''} onClick={()=>setMode('teams')}>Команды</button></div>
+    {error&&<div className="error"><CircleAlert size={18}/>{error}</div>}
     <section className="currency-table-card">
-      <div className="currency-table-heading">
-        <div><h3>{mode === 'players' ? 'Финансовое состояние игроков' : 'Финансовое состояние команд'}</h3><p className="muted">Статистика взята из базы приложения. Денежные значения не подменяются вымышленными расчётами.</p></div>
-        <span>{mode === 'players' ? playerRows.length : teamRows.length} записей</span>
-      </div>
+      <div className="currency-table-heading"><div><h3>{mode==='players'?'Финансовое состояние игроков':'Финансовое состояние команд'}</h3><p className="muted">Доходы пересчитываются из результатов рейтинговых матчей и побед в турнирах. Стоимость и прогноз сохраняются отдельно.</p></div><span>{mode==='players'?playerRows.length:teamRows.length} записей</span></div>
       <div className="table-wrap"><table className="data-table currency-data-table">
-        <thead><tr>{(mode === 'players' ? ['Игрок','Команда','Рейт. игры','Поб/Пор','Рейтинг (win/loss)','Турниры','Итого','Стоимость игрока','Прогноз','Аналитика'] : ['Команда','Победы','Очки','Уровень','Доходы (матчи/чемпионы/доля)','Итого','Стоимость','Прогноз','Аналитика']).map(label => <th key={label}>{label}</th>)}</tr></thead>
-        <tbody>{(mode === 'players' ? playerRows : teamRows).map(row => {
-          const team = mode === 'players' ? teamById.get(row.teamId) : row;
-          const games = Number(row.ratingWins || 0) + Number(row.ratingLosses || 0);
-          return <tr key={row.id}>
-            {mode === 'players' ? <>
-              <td>{row.nickname || '—'}</td><td>{team?.name || row.teamName || '—'}</td><td>{games}</td>
-              <td>{Number(row.ratingWins || 0)}/{Number(row.ratingLosses || 0)}</td>
-              <td>{unavailable}</td><td>—</td><td>{unavailable}</td><td>{unavailable}</td><td>{unavailable}</td>
-            </> : <>
-              <td>{row.name || '—'}</td><td>{Number(row.wins || 0)}</td><td>{Number(row.points || 0)}</td><td>{Number(row.level || 0)}</td>
-              <td>{unavailable}</td><td>{unavailable}</td><td>{unavailable}</td><td>{unavailable}</td>
-            </>}
-            <td><button className="ranked-secondary currency-analytics-btn" onClick={() => setDetails({mode,row})}>Аналитика</button></td>
+        <thead><tr>{(mode==='players'?['Игрок','Команда','Рейт. игры','Поб/Пор','Рейтинг (win/loss)','Турниры','Итого','Стоимость игрока','Прогноз','Аналитика']:['Команда','Победы','Очки','Уровень','Доходы (матчи/чемпионы/доля)','Итого','Стоимость','Прогноз','Аналитика']).map(label=><th key={label}>{label}</th>)}</tr></thead>
+        <tbody>{(mode==='players'?playerRows:teamRows).map(row=>{
+          if(mode==='players')return <tr key={row.id}>
+            <td><span className="currency-player-name"><span className={'player-faction-dot '+(String(row.faction||'').includes('Союз')?'faction-red':String(row.faction||'').includes('Альянс')?'faction-blue':String(row.faction||'').includes('Империя')?'faction-yellow':'faction-neutral')}>●</span>{row.nickname}</span></td>
+            <td>{row.teamName||'—'}</td><td>{row.ratingGames}</td><td>{Number(row.ratingWins||0)}/{Number(row.ratingLosses||0)}</td>
+            <td>{money(row.matchIncome)} / {money(0)}</td><td>{money(row.tournamentIncome)}</td><td><strong>{money(row.totalIncome)}</strong></td><td>{shortMoney(row.marketValueUSD)}</td><td>{shortMoney(row.forecastUSD)}</td>
+            <td><button className="ranked-secondary currency-analytics-btn" onClick={()=>openDetails('players',row)}>Аналитика</button></td>
           </tr>;
+          return <tr key={row.id}><td>{row.name}</td><td>{row.wins||0}</td><td>{row.points||0}</td><td>{row.level||0}</td>
+            <td>{money(row.matchIncome)} / {money(row.tournamentIncome)} / {money(row.shareIncome)}</td><td><strong>{money(row.totalIncome)}</strong></td><td>{shortMoney(row.marketValueUSD)}</td><td>{shortMoney(row.forecastUSD)}</td>
+            <td><button className="ranked-secondary currency-analytics-btn" onClick={()=>openDetails('teams',row)}>Аналитика</button></td></tr>;
         })}</tbody>
       </table></div>
-      {!(mode === 'players' ? playerRows : teamRows).length && <div className="empty-state">Нет записей для отображения.</div>}
+      {!(mode==='players'?playerRows:teamRows).length&&<div className="empty-state">Нет записей для отображения.</div>}
     </section>
     <section className="currency-config-card">
-      <div className="currency-table-heading"><div><h3>Параметры экономики из GameConfig</h3><p className="muted">Показываются только реальные настройки, сохранённые в базе.</p></div><span>{currencyRules.length} параметров</span></div>
-      {currencyRules.length ? <div className="currency-config-list">{currencyRules.map(row => <div key={row.id || row.key}><strong>{row.description || row.key}</strong><span>{row.value}</span></div>)}</div> : <p className="currency-missing">В базе не найдены отдельные настройки доходов, стоимости игрока/команды или прогноза. Поэтому эти суммы пока нельзя корректно рассчитать.</p>}
+      <div className="currency-table-heading"><div><h3>Правила расчёта доходов</h3><p className="muted">Значения хранятся в GameConfig и доступны для редактирования в разделе «Валюта» настроек параметров.</p></div></div>
+      <div className="currency-rules-grid">
+        <div><span>Победа игрока</span><strong>{money(rules.playerWinReward)}</strong></div>
+        <div><span>Доплата капитану</span><strong>{money(rules.captainBonus)}</strong></div>
+        <div><span>Победа команды</span><strong>{money(rules.teamWinReward)}</strong></div>
+        <div><span>Доля команды от доходов игроков</span><strong>{rules.teamSharePercent??0}%</strong></div>
+      </div>
+      <p className="currency-missing">Призы Champions League и Grand League начисляются по отдельным правилам турниров. Для типов турниров без настроенного приза начисление равно 0, пока не будет добавлено правило в GameConfig. Стоимость игрока и прогноз можно указать в «Аналитике» — они сохраняются в базе.</p>
     </section>
-    {details && <div className="modal-backdrop" onClick={() => setDetails(null)}><div className="modal currency-detail-modal" onClick={e => e.stopPropagation()}>
-      <div className="modal-head"><h2>Аналитика: {details.mode === 'players' ? details.row.nickname : details.row.name}</h2><button className="icon-btn" onClick={() => setDetails(null)}><X size={18}/></button></div>
-      <div className="currency-detail-grid">{Object.entries(details.row).filter(([key,value]) => !['id','createdAt','updatedAt','logoUrl','imageUrl'].includes(key) && value !== null && value !== undefined && value !== '').map(([key,value]) => <div key={key}><span>{key}</span><strong>{String(value)}</strong></div>)}</div>
-      <p className="currency-missing">Исторические доходы, стоимость и прогноз нельзя восстановить из имеющихся полей автоматически. Для точного расчёта нужны подтверждённые правила экономики.</p>
-    </div></div>}
+    {details&&<div className="modal-backdrop" onClick={()=>setDetails(null)}><section className="crud-modal currency-detail-modal" onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Финансовая аналитика">
+      <div className="modal-head"><h2>Аналитика: {details.kind==='players'?details.row.nickname:details.row.name}</h2><button className="icon-btn" onClick={()=>setDetails(null)}><X size={18}/></button></div>
+      {details.kind==='players'?<>
+        <div className="currency-detail-grid">
+          <div><span>Доход от рейтинговых побед</span><strong>{money(details.row.matchIncome)}</strong></div>
+          <div><span>Доход от турниров</span><strong>{money(details.row.tournamentIncome)}</strong></div>
+          <div><span>Общий доход</span><strong>{money(details.row.totalIncome)}</strong></div>
+          <div><span>Рейтинговые игры</span><strong>{details.row.ratingGames}</strong></div>
+          <div><span>Победы / поражения</span><strong>{details.row.ratingWins} / {details.row.ratingLosses}</strong></div>
+          <div><span>Команда</span><strong>{details.row.teamName||'—'}</strong></div>
+        </div>
+        <h3 className="currency-subheading">Турнирные начисления</h3>
+        {details.row.tournamentTitles?.length?<div className="currency-title-list">{details.row.tournamentTitles.map(tournament=><div key={tournament.id}><span>{tournament.name} · {tournament.type}</span><strong>{money(tournament.prizeUSD)}</strong></div>)}</div>:<p className="muted">У команды игрока нет сохранённых побед в турнирах.</p>}
+        <form onSubmit={saveValuation} className="currency-valuation-form">
+          <h3>Стоимость и прогноз</h3>
+          <p className="muted">Укажи подтверждённые значения. Они сохранятся в SQL и будут учитываться в общей стоимости команды.</p>
+          <div className="form-grid">
+            <label className="form-field"><span>Стоимость игрока, USD</span><input type="number" min="0" step="1" value={marketValue} onChange={e=>setMarketValue(e.target.value)} placeholder="Например, 6730000"/></label>
+            <label className="form-field"><span>Прогноз, USD</span><input type="number" min="0" step="1" value={forecast} onChange={e=>setForecast(e.target.value)} placeholder="Например, 8750000"/></label>
+          </div>
+          <div className="modal-actions"><button type="button" className="secondary" onClick={()=>{setMarketValue('');setForecast('');}}>Очистить значения</button><button className="primary" type="submit" disabled={saving}>{saving?'Сохранение…':'Сохранить'}</button></div>
+        </form>
+      </>:<>
+        <div className="currency-detail-grid">
+          <div><span>Доход от матчей</span><strong>{money(details.row.matchIncome)}</strong></div>
+          <div><span>Доход от чемпионств</span><strong>{money(details.row.tournamentIncome)}</strong></div>
+          <div><span>Доля от доходов игроков</span><strong>{money(details.row.shareIncome)}</strong></div>
+          <div><span>Итого</span><strong>{money(details.row.totalIncome)}</strong></div>
+          <div><span>Игроков в команде</span><strong>{details.row.playerCount}</strong></div>
+          <div><span>Стоимость состава</span><strong>{shortMoney(details.row.marketValueUSD)}</strong></div>
+        </div>
+        <h3 className="currency-subheading">Состав команды</h3>
+        <div className="currency-title-list">{details.row.players.map(player=><div key={player.id}><span>{player.nickname}</span><strong>{money(player.totalIncome)}</strong></div>)}</div>
+        <p className="muted">Стоимость и прогноз команды суммируются из сохранённых оценок игроков. Чтобы заполнить их, открой аналитику каждого игрока.</p>
+      </>}
+      {message&&<div className="success-message">{message}</div>}
+      {error&&<div className="error">{error}</div>}
+    </section></div>}
   </div>;
 }
 

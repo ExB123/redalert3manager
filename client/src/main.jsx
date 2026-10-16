@@ -190,7 +190,7 @@ function App() {
           {page === 'maps' && <div className="tabs"><button className={subtab==='Карты'?'selected':''} onClick={()=>setSubtab('Карты')}>Карты</button><button className={subtab==='Статистика карт'?'selected':''} onClick={()=>setSubtab('Статистика карт')}>Статистика карт</button></div>}
           {page === 'info' && <div className="tabs">{['Информация','Достижения','Медали','Посты победителей','Витрина достижений'].map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page !== 'settings' && <section className="panel">
-            <div className="panel-head"><div><h2>{sectionTitle}</h2><p className="muted">Данные читаются из локальной SQL-базы независимой версии.</p></div>
+            <div className="panel-head"><div><h2>{sectionTitle}</h2><p className="muted">{page==='rating'&&subtab==='Рейтинг Команд'?'Уровень: каждые 10 побед плюс победы в турнирах. MMR = очки команды × 2.':page==='rating'&&subtab==='Рейтинг Игроков'?'Рейтинг игроков отсортирован по MMR; очки и результаты взяты из базы.':'Данные читаются из локальной SQL-базы независимой версии.'}</p></div>
               <div className="panel-tools">
                 {crudEntity && <button className="primary" onClick={() => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row: null, fields: crudFields }); }}><Plus size={16}/>Добавить</button>}
                 {page !== 'bets' && !(page==='league' && ['Кабинет игрока','Статистика фракций'].includes(subtab)) && <Toolbar search={search} setSearch={setSearch} sort={sort} setSort={setSort} showSort={page==='teams'}/>}

@@ -355,3 +355,7 @@ tbody tr:hover{background:#0a1425}
 .ranked-actions-panel h3{margin:0 0 12px;font-size:16px}
 .ranked-actions-panel .ranked-actions{margin:0;display:flex;flex-wrap:wrap;gap:8px}
 .ranked-actions-panel .muted{margin:10px 0 0;font-size:12px;line-height:1.5}
+
+.ranked-match-rank{display:flex;align-items:center;gap:5px;margin:4px 0 0 16px}
+.ranked-match-rank .image-cell{width:22px;height:22px;flex-basis:22px;border-radius:50%;background:transparent;border:0}
+.ranked-match-rank small{font-size:10px;color:#8d9bb4}

@@ -76,6 +76,14 @@ function App() {
       setData([]);
     } finally { setLoading(false); }
   }
+  async function refreshMail() {
+    try {
+      const response=await fetch('/api/mail');
+      const rows=await response.json();
+      if(!response.ok||!Array.isArray(rows))throw new Error('Не удалось обновить почту.');
+      setData(rows);
+    } catch(e) {setError(e.message||'Не удалось обновить почту.');}
+  }
 
   async function runRankedAction(action) {
     if (rankedBusy) return;
@@ -195,7 +203,7 @@ function App() {
           {page === 'league' && <div className="tabs">{leagueTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'maps' && <div className="tabs"><button className={subtab==='Карты'?'selected':''} onClick={()=>setSubtab('Карты')}>Карты</button><button className={subtab==='Статистика карт'?'selected':''} onClick={()=>setSubtab('Статистика карт')}>Статистика карт</button></div>}
           {page === 'info' && <div className="tabs">{['Информация','Достижения','Медали','Посты победителей','Витрина достижений'].map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
-          {page === 'mail' ? (loading ? <p className="muted">Загрузка почты…</p> : <MailPanel rows={data} onChanged={load} />) : page !== 'settings' && <section className={'panel '+(dashboardUnheaded?'panel-dashboard-unheaded':'')}>
+          {page === 'mail' ? (loading ? <p className="muted">Загрузка почты…</p> : <MailPanel rows={data} onChanged={refreshMail} />) : page !== 'settings' && <section className={'panel '+(dashboardUnheaded?'panel-dashboard-unheaded':'')}>
             {!dashboardUnheaded && <div className="panel-head"><div><h2>{sectionTitle}</h2>{sectionDescription && <p className="muted">{sectionDescription}</p>}</div>
               <div className="panel-tools">
                 {crudEntity && <button className="primary" onClick={() => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row: null, fields: crudFields }); }}><Plus size={16}/>Добавить</button>}

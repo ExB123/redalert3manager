@@ -196,11 +196,15 @@ function App() {
                 {page !== 'bets' && !(page==='league' && ['Кабинет игрока','Статистика фракций'].includes(subtab)) && <Toolbar search={search} setSearch={setSearch} sort={sort} setSort={setSort} showSort={page==='teams'}/>}
               </div>
             </div>
-            {page === 'league' && subtab === 'Рейтинговые матчи' && <div className="ranked-actions">
-              <button className="primary" disabled={rankedBusy} onClick={() => runRankedAction('find-opponent')}><Search size={16}/>{rankedBusy ? 'Обработка…' : 'Найти соперника'}</button>
-              <button className="ranked-secondary" disabled={rankedBusy} onClick={() => runRankedAction('simulate-20')}><Swords size={16}/>{rankedBusy ? 'Обработка…' : 'Провести 20 матчей'}</button>
-              <button className="ranked-secondary" disabled={rankedBusy} onClick={() => runRankedAction('simulate-upcoming')}><RefreshCw size={16}/>{rankedBusy ? 'Обработка…' : 'Симулировать ближайшие матчи'}</button>
-            </div>}
+            {page === 'league' && subtab === 'Рейтинговые матчи' && <section className="ranked-actions-panel">
+              <h3>Автоподбор матчей</h3>
+              <div className="ranked-actions">
+                <button className="primary" disabled={rankedBusy} onClick={() => runRankedAction('find-opponent')}><Search size={16}/>{rankedBusy ? 'Обработка…' : 'Найти соперника'}</button>
+                <button className="ranked-secondary" disabled={rankedBusy} onClick={() => runRankedAction('simulate-20')}><Swords size={16}/>{rankedBusy ? 'Обработка…' : 'Провести 20 матчей'}</button>
+                <button className="ranked-secondary" disabled={rankedBusy} onClick={() => runRankedAction('simulate-upcoming')}><RefreshCw size={16}/>{rankedBusy ? 'Обработка…' : 'Симулировать ближайшие матчи'}</button>
+              </div>
+              <p className="muted">«Найти соперника» подбирает матч для основного игрока и создаёт ещё до 20 пар. «Провести 20 матчей» создаёт 20 пар без участия основного игрока. Затем «Симулировать ближайшие матчи» рассчитывает результаты этих пар, не затрагивая игры основного игрока.</p>
+            </section>}
             {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
             {actionMessage && <div className="success-message">{actionMessage}</div>}
             

@@ -11,6 +11,11 @@ const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'ra3-ma
 if (!fs.existsSync(dbPath)) throw new Error(`Database not found: ${dbPath}`);
 const db = new Database(dbPath, { fileMustExist: true });
 db.pragma('foreign_keys = ON');
+db.exec(`CREATE TABLE IF NOT EXISTS BackupLog (
+  id TEXT PRIMARY KEY,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  data TEXT NOT NULL
+)`);
 db.exec(`CREATE TABLE IF NOT EXISTS PlayerFinance (
   playerId TEXT PRIMARY KEY REFERENCES Player(id) ON DELETE CASCADE ON UPDATE CASCADE,
   marketValueUSD INTEGER,
@@ -431,6 +436,72 @@ app.put('/api/achievement-showcase/:id/achievements', (req, res) => {
 app.get('/api/simulations', (_req, res) => {
   res.json(db.prepare(`SELECT id,createdAt,input,result FROM Simulation ORDER BY createdAt DESC LIMIT 100`).all());
 });
+
+app.get('/api/backups', (_req,res) => {
+  try {
+    const rows=db.prepare('SELECT id,createdAt,data FROM BackupLog ORDER BY createdAt DESC LIMIT 100').all();
+    res.json(rows.map(row=>{
+      let parsed=null;
+      try { parsed=JSON.parse(row.data); } catch {}
+      const tables=parsed?.tables && typeof parsed.tables==='object' ? parsed.tables : null;
+      const counts=tables ? Object.fromEntries(Object.entries(tables).map(([name,items])=>[name,Array.isArray(items)?items.length:0])) : {};
+      return {id:row.id,createdAt:row.createdAt,format:parsed?.format||'legacy',restorable:parsed?.format==='ra3-manager-backup'&&parsed?.version===1&&!!tables,tableCount:Object.keys(counts).length,counts};
+    }));
+  } catch(error) { res.status(500).json({error:safeErrorMessage(error)}); }
+});
+app.post('/api/backups', (_req,res) => {
+  try {
+    const tableNames=db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name<>'BackupLog' ORDER BY name`).all().map(row=>row.name);
+    const tables={};
+    for(const name of tableNames) {
+      if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new Error('Обнаружено недопустимое имя таблицы: '+name);
+      tables[name]=db.prepare(`SELECT * FROM "${name}"`).all();
+    }
+    const now=new Date().toISOString();
+    const id=crypto.randomUUID().replace(/-/g,'');
+    const data=JSON.stringify({format:'ra3-manager-backup',version:1,timestamp:now,tables});
+    db.prepare('INSERT INTO BackupLog (id,createdAt,data) VALUES (?,?,?)').run(id,now,data);
+    res.status(201).json({ok:true,id,createdAt:now,tableCount:tableNames.length,counts:Object.fromEntries(Object.entries(tables).map(([name,rows])=>[name,rows.length]))});
+  } catch(error) { res.status(500).json({error:safeErrorMessage(error)}); }
+});
+app.post('/api/backups/:id/restore', (req,res) => {
+  try {
+    const backup=db.prepare('SELECT id,createdAt,data FROM BackupLog WHERE id=?').get(req.params.id);
+    if(!backup) return res.status(404).json({error:'Резервная копия не найдена.'});
+    let parsed;
+    try { parsed=JSON.parse(backup.data); } catch { return res.status(400).json({error:'Файл резервной копии содержит некорректный JSON.'}); }
+    if(parsed?.format!=='ra3-manager-backup'||parsed?.version!==1||!parsed.tables||typeof parsed.tables!=='object'||Array.isArray(parsed.tables)) {
+      return res.status(400).json({error:'Эта старая резервная запись не содержит полной копии базы и не может быть восстановлена.'});
+    }
+    const currentTables=db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name<>'BackupLog'`).all().map(row=>row.name);
+    const snapshotNames=Object.keys(parsed.tables);
+    if(snapshotNames.some(name=>!currentTables.includes(name))||currentTables.some(name=>!Array.isArray(parsed.tables[name]))) {
+      return res.status(400).json({error:'Состав таблиц резервной копии не совпадает с текущей базой. Восстановление отменено, данные не изменены.'});
+    }
+    for(const name of snapshotNames) if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return res.status(400).json({error:'В резервной копии обнаружено недопустимое имя таблицы.'});
+    const preferredOrder=['Team','Season','RatingLeague','Map','Rank','Player','Tournament','Match','RatingMatch','MapStat','Achievement','Medal','News','WinnerPost','AchievementShowcase','_AchievementToAchievementShowcase','GameConfig','Mail','Simulation','PlayerFinance','TeamFinance'];
+    const order=[...preferredOrder.filter(name=>snapshotNames.includes(name)),...snapshotNames.filter(name=>!preferredOrder.includes(name))];
+    const restore=db.transaction(()=>{
+      db.pragma('defer_foreign_keys = ON');
+      for(const name of [...order].reverse()) db.prepare(`DELETE FROM "${name}"`).run();
+      for(const name of order) {
+        const rows=parsed.tables[name];
+        const columns=tableColumns(name);
+        for(const row of rows) {
+          if(!row||typeof row!=='object'||Array.isArray(row)) throw new Error('Строка в таблице '+name+' повреждена.');
+          const keys=Object.keys(row).filter(key=>columns.has(key));
+          if(!keys.length) continue;
+          const sql=`INSERT INTO "${name}" (${keys.map(key=>'"'+key+'"').join(',')}) VALUES (${keys.map(()=>'?').join(',')})`;
+          db.prepare(sql).run(...keys.map(key=>row[key]));
+        }
+      }
+      return Object.fromEntries(order.map(name=>[name,parsed.tables[name].length]));
+    });
+    const counts=restore();
+    res.json({ok:true,backupId:backup.id,backupCreatedAt:backup.createdAt,restoredTables:order.length,counts,message:'База восстановлена из полной резервной копии.'});
+  } catch(error) { res.status(400).json({error:safeErrorMessage(error)}); }
+});
+
 
 
 // Ranked-match mechanics are driven by RatingMatch and GameConfig.match_win from the original SQL schema.

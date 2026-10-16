@@ -166,6 +166,12 @@ function App() {
   else if (page === 'info' && subtab === 'Информация') columns = [['Заголовок','title'],['Текст новости','content'],['Турнир','relatedTournamentName'],['Карта матча','relatedMatchMap'],['Дата','createdAt']];
   else if (page === 'info' && subtab === 'Витрина достижений') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Название','name'],['Описание','description'],['Достижения','achievementNames'],['Создана','createdAt']];
 
+  if (page === 'league' && subtab === 'Лучшие игроки') sectionTitle = 'Топ-10 игроков рейтинговых игр';
+  if (page === 'maps' && subtab === 'Статистика карт') sectionTitle = 'Статистика карт (1×1)';
+  const dashboardUnheaded = page === 'league' && ['Рейтинговые матчи','Статистика фракций'].includes(subtab);
+  const sectionDescription = page === 'rating' && ['Рейтинг Команд','Рейтинг Игроков'].includes(subtab)
+    ? 'MMR начисляется только за победы в турнирах (400 MMR за победу)'
+    : '';
   const crudEntity = entityFor(page, subtab);
   const crudFields = fieldsFor(page, subtab);
 
@@ -189,13 +195,13 @@ function App() {
           {page === 'league' && <div className="tabs">{leagueTabs.map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
           {page === 'maps' && <div className="tabs"><button className={subtab==='Карты'?'selected':''} onClick={()=>setSubtab('Карты')}>Карты</button><button className={subtab==='Статистика карт'?'selected':''} onClick={()=>setSubtab('Статистика карт')}>Статистика карт</button></div>}
           {page === 'info' && <div className="tabs">{['Информация','Достижения','Медали','Посты победителей','Витрина достижений'].map(t=><button key={t} className={subtab===t?'selected':''} onClick={()=>setSubtab(t)}>{t}</button>)}</div>}
-          {page === 'mail' ? (loading ? <p className="muted">Загрузка почты…</p> : <MailPanel rows={data} onChanged={load} />) : page !== 'settings' && <section className="panel">
-            <div className="panel-head"><div><h2>{sectionTitle}</h2><p className="muted">{page==='rating'&&subtab==='Рейтинг Команд'?'Уровень: каждые 10 побед плюс победы в турнирах. MMR начисляется за турнирные места по правилам GameConfig.':page==='rating'&&subtab==='Рейтинг Игроков'?'Рейтинг игроков отсортирован по MMR; очки и результаты взяты из базы.':'Данные читаются из локальной SQL-базы независимой версии.'}</p></div>
+          {page === 'mail' ? (loading ? <p className="muted">Загрузка почты…</p> : <MailPanel rows={data} onChanged={load} />) : page !== 'settings' && <section className={'panel '+(dashboardUnheaded?'panel-dashboard-unheaded':'')}>
+            {!dashboardUnheaded && <div className="panel-head"><div><h2>{sectionTitle}</h2>{sectionDescription && <p className="muted">{sectionDescription}</p>}</div>
               <div className="panel-tools">
                 {crudEntity && <button className="primary" onClick={() => { setActionMessage(''); setCrudDialog({ entity: crudEntity, row: null, fields: crudFields }); }}><Plus size={16}/>Добавить</button>}
                 {page !== 'bets' && !(page==='league' && ['Кабинет игрока','Статистика фракций'].includes(subtab)) && <Toolbar search={search} setSearch={setSearch} sort={sort} setSort={setSort} showSort={page==='teams'}/>}
               </div>
-            </div>
+            </div>}
             {page === 'league' && subtab === 'Рейтинговые матчи' && <section className="ranked-actions-panel">
               <h3>Автоподбор матчей</h3>
               <div className="ranked-actions">

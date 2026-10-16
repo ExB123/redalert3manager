@@ -944,65 +944,73 @@ function MapStatsPanel({rows}) {
 }
 
 function PlayerCabinet({players,onFindMatch}) {
-  const [query,setQuery] = useState('');
-  const [selectedId,setSelectedId] = useState('');
+  const [mainPlayerId,setMainPlayerId] = useState('');
   const [ratingMatches,setRatingMatches] = useState([]);
   const [matchesError,setMatchesError] = useState('');
-  useEffect(() => {
-    let active = true;
-    fetch('/api/rating-matches').then(async response => {
-      const rows = await response.json();
-      if (!response.ok) throw new Error(rows.error || 'Не удалось загрузить матчи игрока.');
-      if (active) setRatingMatches(Array.isArray(rows) ? rows : []);
-    }).catch(error => { if (active) setMatchesError(error.message); });
-    return () => { active = false; };
-  }, []);
-  const filtered = players.filter(p => String(p.nickname || '').toLowerCase().includes(query.trim().toLowerCase()));
-  const player = filtered.find(p => p.id === selectedId) || filtered[0] || null;
-  useEffect(() => {
-    if (!filtered.some(p => p.id === selectedId)) setSelectedId(filtered[0]?.id || '');
-  }, [players, query]);
-  if (!players.length) return <div className="empty-state">Игроки не найдены. Сначала добавьте игроков в разделе «Список игроков».</div>;
-  const ratedGames = Number(player?.ratingWins || 0) + Number(player?.ratingLosses || 0);
-  const winRate = ratedGames ? Math.round(Number(player.ratingWins || 0) / ratedGames * 100) : 0;
+  async function refreshMatches() {
+    try {
+      const response=await fetch('/api/rating-matches');
+      const body=await response.json();
+      if(!response.ok)throw new Error(body.error||'Не удалось загрузить матчи игрока.');
+      setRatingMatches(Array.isArray(body)?body:[]);setMatchesError('');
+    } catch(error){setMatchesError(error.message||'Не удалось загрузить историю матчей.');}
+  }
+  useEffect(()=>{
+    let active=true;
+    fetch('/api/settings/main-player').then(async response=>{const body=await response.json();if(!response.ok)throw new Error(body.error||'Не удалось загрузить основного игрока.');if(active)setMainPlayerId(body.player?.id||'');})
+      .catch(error=>{if(active)setMatchesError(error.message||'Не удалось загрузить основного игрока.');});
+    return ()=>{active=false;};
+  },[]);
+  useEffect(()=>{refreshMatches();},[]);
+  const player=players.find(item=>item.id===mainPlayerId)||players.find(item=>String(item.nickname||'').toLowerCase()==='gganz')||players[0]||null;
+  if(!players.length)return <div className="empty-state">Игроки не найдены. Сначала добавьте игроков в разделе «Список игроков».</div>;
+  if(!player)return <div className="empty-state">Основной игрок не выбран. Укажите его в настройках.</div>;
+  const playerMatches=ratingMatches.filter(match=>match.player1Id===player.id||match.player2Id===player.id);
+  const upcoming=playerMatches.filter(match=>!match.completed).sort((a,b)=>String(a.scheduledAt||'').localeCompare(String(b.scheduledAt||'')));
+  const history=playerMatches.filter(match=>Boolean(match.completed)).sort((a,b)=>String(b.scheduledAt||'').localeCompare(String(a.scheduledAt||''))).slice(0,10);
+  const nextMatch=upcoming[0]||null;
+  const opponentId=nextMatch?(nextMatch.player1Id===player.id?nextMatch.player2Id:nextMatch.player1Id):'';
+  const opponent=players.find(item=>item.id===opponentId)||null;
+  const factionClass=value=>{
+    const v=String(value||'').toLowerCase();
+    if(v.includes('союз')||v.includes('soviet'))return 'faction-red';
+    if(v.includes('альянс')||v.includes('allied')||v.includes('allies'))return 'faction-blue';
+    if(v.includes('импер')||v.includes('empire'))return 'faction-yellow';
+    return 'faction-neutral';
+  };
+  const formatDate=value=>value?new Date(value).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  const recentResult=person=>{
+    const match=playerMatches.filter(item=>Boolean(item.completed)).sort((a,b)=>String(b.scheduledAt||'').localeCompare(String(a.scheduledAt||'')))[0];
+    if(!match)return null;
+    const opponentName=match.player1Id===person.id?match.player2:match.player1;
+    return {result:match.winnerId===person.id?'Победа':'Поражение',opponent:opponentName,map:match.map};
+  };
+  const mainLast=recentResult(player);
+  const opponentLast=opponent?recentResult(opponent):null;
+  const matchCard=(person,matchPlayerName,label,last)=>person?<article className="cabinet-upcoming-player">
+    <div className="cabinet-upcoming-player-head"><ImageCell src={person.rankImageUrl} alt={person.rankName||'Звание'} type="rank"/><div><small>{label}</small><strong>{person.nickname}</strong><span className="cabinet-rank-label">{person.rankName||'Звание не назначено'}</span></div></div>
+    <p className="cabinet-faction-line"><span className={'player-faction-dot '+factionClass(person.faction)}>●</span><FactionName value={person.faction}/></p>
+    <div className="cabinet-upcoming-player-stats"><div><span>RP</span><strong>{person.rpPoints??0}</strong></div><div><span>Рейтинговые игры</span><strong>{Number(person.ratingWins||0)+Number(person.ratingLosses||0)}</strong></div><div><span>Победы/поражения</span><strong>{person.ratingWins??0} / {person.ratingLosses??0}</strong></div></div>
+    {last&&<p className={'cabinet-last-result '+(last.result==='Победа'?'win':'loss')}>Последний матч: {last.result} {last.opponent?'против '+last.opponent:''}{last.map?' (карта: '+last.map+')':''}</p>}
+  </article>:<article className="cabinet-upcoming-player cabinet-no-opponent"><span>{matchPlayerName||'Игрок'}</span><p>Профиль соперника не найден в базе.</p></article>;
   return <div className="player-cabinet">
-    <div className="cabinet-find-match"><button className="primary" onClick={async()=>{await onFindMatch?.();try{const response=await fetch('/api/rating-matches');const rows=await response.json();if(response.ok)setRatingMatches(Array.isArray(rows)?rows:[]);}catch(e){setMatchesError(e.message||'Не удалось обновить историю матчей.');}}}><Search size={16}/>Найти матч</button><p className="muted">Подбор создаёт матч для основного игрока и до 20 дополнительных пар других игроков.</p></div>
-    <div className="cabinet-picker">
-      <label className="form-field"><span>Найти игрока</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Введите ник игрока…"/></label>
-      <label className="form-field"><span>Профиль игрока</span><select value={player?.id || ''} onChange={e=>setSelectedId(e.target.value)}>{filtered.map(p=><option key={p.id} value={p.id}>{p.nickname} — {p.teamName || 'Без команды'}</option>)}</select></label>
+    <div className="cabinet-find-match"><button className="primary" onClick={async()=>{await onFindMatch?.();await refreshMatches();}}><Search size={16}/>Найти матч</button><p className="muted">Поиск подбирает соперника для {player.nickname} и создаёт матч с картой 1×1, а также ещё 20 матчей других пар.</p></div>
+    <div className="cabinet-match-sections">
+      <section className="cabinet-match-card cabinet-next-match-card">
+        <div className="cabinet-match-head"><h3>Предстоящий матч</h3>{upcoming.length>1&&<span>Ещё {upcoming.length-1}</span>}</div>
+        {nextMatch?<><div className="cabinet-next-match-meta"><span>Запланировано: {formatDate(nextMatch.scheduledAt)}</span><span>Карта: <strong>{nextMatch.map||'Не выбрана'}</strong></span></div>
+          <div className="cabinet-upcoming-versus">{matchCard(player,player.nickname,'Игрок 1 ('+player.nickname+')',mainLast)}<div className="cabinet-versus-label">VS</div>{matchCard(opponent,opponent?.nickname||'Соперник','Игрок 2 (соперник)',opponentLast)}</div>
+        </>:<p className="muted">Предстоящих рейтинговых матчей нет. Нажми «Найти матч», чтобы создать матч для основного игрока.</p>}
+      </section>
+      <section className="cabinet-match-card cabinet-history-card"><div className="cabinet-match-head"><h3>История матчей {player.nickname}</h3><span>{history.length}</span></div>
+        {!history.length?<p className="muted">Завершённых рейтинговых матчей пока нет.</p>:<div className="table-wrap"><table className="data-table cabinet-history-table"><thead><tr><th>Дата</th><th>Соперник</th><th>Результат</th></tr></thead><tbody>{history.map(match=>{
+          const opponentName=match.player1Id===player.id?match.player2:match.player1;
+          const won=match.winnerId===player.id;
+          return <tr key={match.id}><td>{formatDate(match.scheduledAt)}</td><td>{opponentName||'—'}</td><td><span className={'match-result '+(won?'win':'loss')}>{won?'Победа':'Поражение'}</span></td></tr>;
+        })}</tbody></table></div>}
+      </section>
     </div>
-    {!player ? <div className="empty-state">По этому запросу игроков нет.</div> : <>
-      <div className="cabinet-profile">
-        <div className="cabinet-identity"><ImageCell src={player.rankImageUrl} alt={player.rankName} type="rank"/><div><h3>{player.nickname}</h3><p>{player.teamName || 'Без команды'} · <FactionName value={player.faction}/></p><span>{player.rankName || 'Звание не назначено'}{player.position ? ' · '+player.position : ''}</span></div></div>
-        <div className="cabinet-stats">
-          <div><span>RP</span><strong>{player.rpPoints ?? 0}</strong></div>
-          <div><span>MMR</span><strong>{player.ratingPoints ?? 0}</strong></div>
-          <div><span>Пиковый RP</span><strong>{player.rpPeak ?? 0}</strong></div>
-          <div><span>Опыт</span><strong>{player.experience ?? 0}</strong></div>
-          <div><span>Рейтинговые игры</span><strong>{ratedGames}</strong></div>
-          <div><span>Победы</span><strong>{player.ratingWins ?? 0}</strong></div>
-          <div><span>Поражения</span><strong>{player.ratingLosses ?? 0}</strong></div>
-          <div><span>Процент побед</span><strong>{winRate}%</strong></div>
-          <div><span>Победы в матчах</span><strong>{player.matchWins ?? 0}</strong></div>
-        </div>
-      </div>
-      <div className="cabinet-details"><div><span>Лучшая карта</span><strong>{player.bestMap || '—'}</strong></div><div><span>Худшая карта</span><strong>{player.worstMap || '—'}</strong></div><div><span>Капитан команды</span><strong>{player.isTeamCaptain ? 'Да' : 'Нет'}</strong></div></div>
-      {(() => {
-        const playerMatches = ratingMatches.filter(match => match.player1Id === player.id || match.player2Id === player.id);
-        const upcoming = playerMatches.filter(match => !match.completed).sort((a,b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)));
-        const history = playerMatches.filter(match => match.completed).sort((a,b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt))).slice(0,10);
-        return <div className="cabinet-match-sections">
-          <section className="cabinet-match-card"><div className="cabinet-match-head"><h3>Предстоящие матчи</h3><span>{upcoming.length}</span></div>
-            {!upcoming.length ? <p className="muted">Предстоящих рейтинговых матчей нет.</p> : upcoming.slice(0,5).map(match => <div className="cabinet-match-row" key={match.id}><div><strong>{match.player1 || 'Игрок'} vs {match.player2 || 'Игрок'}</strong><small>{match.map || 'Карта не выбрана'}</small></div><time>{match.scheduledAt ? new Date(match.scheduledAt).toLocaleString() : 'Время не указано'}</time></div>)}
-          </section>
-          <section className="cabinet-match-card"><div className="cabinet-match-head"><h3>История матчей</h3><span>{history.length}</span></div>
-            {!history.length ? <p className="muted">Завершённых рейтинговых матчей пока нет.</p> : history.map(match => <div className="cabinet-match-row" key={match.id}><div><strong>{match.player1 || 'Игрок'} vs {match.player2 || 'Игрок'}</strong><small>{match.map || 'Карта не выбрана'}</small></div><span className={match.winnerId === player.id ? 'match-result win' : 'match-result loss'}>{match.winnerId === player.id ? 'Победа' : 'Поражение'}</span></div>)}
-          </section>
-          {matchesError && <p className="muted">{matchesError}</p>}
-        </div>;
-      })()}
-      <p className="muted cabinet-note">Профиль и матчи загружаются из локальной базы. Доступны только данные, которые уже сохранены в приложении.</p>
-    </>}
+    {matchesError&&<p className="muted">{matchesError}</p>}
   </div>;
 }
 

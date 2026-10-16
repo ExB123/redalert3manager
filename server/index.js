@@ -524,8 +524,8 @@ app.put('/api/settings/main-player', (req,res) => {
     if (!player) return res.status(400).json({error:'Выберите существующего игрока.'});
     const now = new Date().toISOString();
     const current = db.prepare("SELECT id FROM GameConfig WHERE key='main_player_id'").get();
-    if (current) db.prepare("UPDATE GameConfig SET value=?,description=?,updatedAt=? WHERE key='main_player_id'").run(player.id,'Основной игрок для поиска рейтингового соперника',now);
-    else db.prepare("INSERT INTO GameConfig (id,key,value,description,createdAt,updatedAt) VALUES (?,?,?,?,?,?)").run(crypto.randomUUID().replace(/-/g,''),'main_player_id',player.id,'Основной игрок для поиска рейтингового соперника',now,now);
+    if (current) db.prepare("UPDATE GameConfig SET value=?,description=? WHERE key='main_player_id'").run(player.id,'Основной игрок для поиска рейтингового соперника');
+    else db.prepare("INSERT INTO GameConfig (id,key,value,description,createdAt) VALUES (?,?,?,?,?)").run(crypto.randomUUID().replace(/-/g,''),'main_player_id',player.id,'Основной игрок для поиска рейтингового соперника',now);
     res.json({ok:true,player});
   } catch(error) { res.status(400).json({error:error.message || 'Не удалось сохранить игрока.'}); }
 });

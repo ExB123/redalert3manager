@@ -423,3 +423,15 @@ tbody tr:hover{background:#0a1425}
 @media(max-width:600px){.mail-summary{flex-direction:column}.mail-counts{white-space:normal}.mail-filters{grid-template-columns:1fr}.mail-filters .form-field:first-child{grid-column:auto}.mail-detail-top{flex-direction:column}.mail-detail-top .ranked-secondary{width:100%}}
 
 .panel-dashboard-unheaded{padding:0;background:transparent;border:0;box-shadow:none}
+
+/* Match the compact table logos in the reference while keeping standalone badges large. */
+.image-cell{width:60px;height:60px;flex-basis:60px}
+.image-team{width:58px;height:58px;flex-basis:58px}
+.image-rank{width:68px;height:68px;flex-basis:68px}
+.image-league{width:96px;height:62px;flex-basis:96px}
+.rank-cell{min-height:68px;gap:11px}
+.team-name{gap:9px}
+.team-name .image-cell{width:28px;height:28px;flex-basis:28px;border-radius:50%}
+.team-name .image-cell img{width:100%;height:100%;padding:0}
+th,td{padding:10px 14px}
+@media(max-width:760px){th,td{padding:10px 10px}.image-cell{width:52px;height:52px;flex-basis:52px}.image-rank{width:60px;height:60px;flex-basis:60px}.image-league{width:80px;height:52px;flex-basis:80px}.team-name .image-cell{width:24px;height:24px;flex-basis:24px}}

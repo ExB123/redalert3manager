@@ -284,7 +284,7 @@ function App() {
       const response = await fetch('/api/matches/' + encodeURIComponent(row.id) + '/complete', { method:'POST' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));
-      setActionMessage('Матч завершён. Победитель: ' + result.winner + '.' + (result.nextMatchAdvanced ? ' Победитель добавлен в следующий матч сетки.' : ''));
+      setActionMessage('Матч завершён. Победитель: ' + result.winner + '.' + (result.nextMatchAdvanced ? ' Победитель добавлен в следующий матч сетки.' : '') + (result.tournamentWinnerUpdated ? ' Турнир завершён: победитель записан в турнир.' : ''));
       await load();
     } catch (e) {
       setActionMessage('Не удалось завершить матч: ' + e.message);

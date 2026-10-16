@@ -11,7 +11,7 @@ db.exec("CREATE TABLE Team(id TEXT PRIMARY KEY,name TEXT NOT NULL,logoUrl TEXT,w
 "CREATE TABLE Match(id TEXT PRIMARY KEY,tournamentId TEXT,homeTeamId TEXT,awayTeamId TEXT,homeScore INTEGER,awayScore INTEGER,winnerId TEXT,completed INTEGER DEFAULT 0,map TEXT,nextMatchId TEXT,round INTEGER,updatedAt TEXT,createdAt TEXT);"+
 "CREATE TABLE GameConfig(id TEXT PRIMARY KEY,key TEXT NOT NULL UNIQUE,value TEXT NOT NULL,description TEXT,createdAt TEXT);"+
 "CREATE TABLE Map(id TEXT PRIMARY KEY,name TEXT NOT NULL,playersCount INTEGER DEFAULT 2,imageUrl TEXT,description TEXT);"+
-"CREATE TABLE Rank(id TEXT PRIMARY KEY,name TEXT,imageUrl TEXT);"+
+"CREATE TABLE Rank(id TEXT PRIMARY KEY,name TEXT,description TEXT,imageUrl TEXT,requiredWins INTEGER NOT NULL DEFAULT 0,requiredXP INTEGER NOT NULL DEFAULT 0,createdAt TEXT);"+
 "CREATE TABLE MapStat(id TEXT PRIMARY KEY,mapName TEXT,mapId TEXT,wins INTEGER DEFAULT 0,losses INTEGER DEFAULT 0,teamId TEXT,playerId TEXT,createdAt TEXT);"+
 "CREATE TABLE RatingMatch(id TEXT PRIMARY KEY,player1Id TEXT NOT NULL,player2Id TEXT NOT NULL,scheduledAt TEXT NOT NULL,completed INTEGER DEFAULT 0,winnerId TEXT,createdAt TEXT,updatedAt TEXT,map TEXT);"+
 "CREATE TABLE Simulation(id TEXT PRIMARY KEY,createdAt TEXT,input TEXT NOT NULL,result TEXT NOT NULL);"+
@@ -48,6 +48,8 @@ const addMapStat=db.prepare('INSERT INTO MapStat(id,mapName,mapId,wins,losses,te
 addMapStat.run('ms-gg','Обычное столкновение','m1',5,2,null,'gg',now);
 addMapStat.run('ms-mo','Обычное столкновение','m1',4,3,null,'mo',now);
 addMapStat.run('ms-ma','Промышленная мощь','m2',1,6,null,'ma',now);
+const addRank=db.prepare('INSERT INTO Rank(id,name,requiredWins,requiredXP,createdAt) VALUES(?,?,?,?,?)');
+addRank.run('rank-newbie','Новобранец',0,0,now);addRank.run('rank-lieutenant','Старший лейтенант',0,31000,now);addRank.run('rank-captain','Капитан',0,38000,now);
 const addMail=db.prepare('INSERT INTO Mail(id,playerId,subject,body,kind,isRead,meta,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?,?,?)');
 addMail.run('mail-transfer','gg','Трансферное предложение от Astralis','Предлагается перейти в Astralis.','transfer',0,JSON.stringify({type:'transfer',teamId:'as',teamName:'Astralis',role:'Капитан',contractYears:2,transferFeeUSD:900000,annualSalaryUSD:300000,signingBonusUSD:50000}),now,now);
 addMail.run('mail-coop','gg','Партнёрство с HyperX','Предложение о сотрудничестве.','cooperation',0,JSON.stringify({type:'cooperation',company:'HyperX',amountUSD:15000,durationMonths:6,perks:['стримы','мерч']}),now,now);
@@ -82,6 +84,10 @@ const defaultMain=await req('/api/settings/main-player');assert.equal(defaultMai
 const changedMain=await req('/api/settings/main-player',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:'mo'})});assert.equal(changedMain.player.nickname,'mONESY');
 assert.equal((await req('/api/settings/main-player')).player.nickname,'mONESY');
 await req('/api/settings/main-player',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:'gg'})});
+await req('/api/manage/players/gg',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({experience:34016})});
+assert.equal((await req('/api/players')).find(player=>player.nickname==='GGanz').rankName,'Старший лейтенант');
+await req('/api/manage/players/gg',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({experience:38000})});
+assert.equal((await req('/api/players')).find(player=>player.nickname==='GGanz').rankName,'Капитан');
 let c=await req('/api/currency');let gg=c.players.find(p=>p.nickname==='GGanz'),ds=c.teams.find(t=>t.name==='DS Esports'),as=c.teams.find(t=>t.name==='Astralis');
 assert.equal(gg.matchIncome,129000);assert.ok(Math.abs(gg.tournamentIncome-595000)<1);assert.ok(Math.abs(gg.totalIncome-724000)<1);
 assert.equal(ds.matchIncome,330000);assert.equal(ds.tournamentIncome,7500000);assert.equal(ds.shareIncome,402000);assert.equal(ds.totalIncome,8232000);
@@ -129,6 +135,6 @@ const restored=await req('/api/backups/'+backup.id+'/restore',{method:'POST',hea
 assert.equal(restored.ok,true);
 assert.ok((await req('/api/teams')).some(team=>team.name==='DS Esports'));
 assert.ok(!(await req('/api/teams')).some(team=>team.name==='Temporary Backup Test Team'));
-console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, saved main-player settings, mail reading and transfer acceptance, protected completed-match history, full database backup and restore, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
+console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, saved main-player settings, rank progression from XP thresholds, mail reading and transfer acceptance, protected completed-match history, full database backup and restore, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
 }finally{await stop();for(const f of ['test.sqlite','test.sqlite-shm','test.sqlite-wal'])try{fs.rmSync(path.join(dir,f),{force:true});}catch{}try{fs.rmSync(dir,{recursive:true,force:true});}catch{}}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});

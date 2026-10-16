@@ -228,7 +228,8 @@ app.get('/api/currency', (_req,res) => {
         tournamentTitles:titles.map(tournament=>({id:tournament.id,name:tournament.name,type:tournament.type,prizeUSD:currencyTournamentPrize(tournament.type,'team')})),
         players:roster.map(player=>({id:player.id,nickname:player.nickname,totalIncome:player.totalIncome,marketValueUSD:player.marketValueUSD,forecastUSD:player.forecastUSD}))};
     });
-    res.json({players:playerRows,teams:teamRows,rules:{playerWinReward,captainBonus,teamWinReward,teamSharePercent}});
+    const configRows=db.prepare("SELECT id,key,value,description FROM GameConfig WHERE key LIKE 'currency_%' ORDER BY key ASC").all();
+    res.json({players:playerRows,teams:teamRows,rules:{playerWinReward,captainBonus,teamWinReward,teamSharePercent},configRows});
   } catch(error) { res.status(500).json({error:safeErrorMessage(error)}); }
 });
 app.put('/api/currency/players/:id', (req,res) => {

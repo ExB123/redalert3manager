@@ -819,7 +819,7 @@ const editableEntities = {
   seasons: { table: 'Season', fields: ['name','startDate','endDate','isActive'], required: ['name'] },
   maps: { table: 'Map', fields: ['name','imageUrl','description','playersCount'], required: ['name'] },
   'map-stats': { table: 'MapStat', fields: ['mapName','mapId','teamId','playerId','wins','losses'], required: ['mapName'] },
-  ranks: { table: 'Rank', fields: ['name','description','imageUrl','requiredWins','requiredXP'], required: ['name'] },
+  ranks: { table: 'Rank', fields: ['name','description','imageUrl','requiredWins','requiredXP'], required: ['name','requiredWins','requiredXP'] },
   leagues: { table: 'RatingLeague', fields: ['name','description','imageUrl','requiredPoints','orderIndex'], required: ['name'] },
   config: { table: 'GameConfig', fields: ['key','value','description'], required: ['key','value'] },
   news: { table: 'News', fields: ['title','content','relatedMatchId','relatedTournamentId'], required: ['title','content'] },
@@ -872,6 +872,7 @@ app.post('/api/manage/:entity', (req, res) => {
   if (!entity) return;
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
+    if (entity.table === 'Rank' && ['requiredWins','requiredXP'].some(field=>!Number.isInteger(Number(body[field]))||Number(body[field])<0)) return res.status(400).json({error:'Для звания укажите неотрицательные целые значения побед и опыта.'});
     if (entity.table === 'RatingMatch') {
       if (body.completed || body.winnerId) return res.status(400).json({ error: 'Результат рейтингового матча фиксируется только кнопкой выбора победителя.' });
       if (body.player1Id && body.player2Id && body.player1Id === body.player2Id) return res.status(400).json({ error: 'Игроки в рейтинговом матче должны различаться.' });
@@ -912,6 +913,7 @@ app.put('/api/manage/:entity/:id', (req, res) => {
     if (entity.table === 'Match' && exists.completed) return res.status(409).json({ error: 'Завершённый матч зафиксирован. Для изменения результата нужен отдельный откат статистики.' });
     if (entity.table === 'RatingMatch' && exists.completed) return res.status(409).json({ error: 'Завершённый рейтинговый матч зафиксирован, чтобы не нарушить рейтинги и историю.' });
     const body = req.body && typeof req.body === 'object' ? req.body : {};
+    if (entity.table === 'Rank' && ['requiredWins','requiredXP'].some(field=>Object.prototype.hasOwnProperty.call(body,field)&&(!Number.isInteger(Number(body[field]))||Number(body[field])<0))) return res.status(400).json({error:'Для звания укажите неотрицательные целые значения побед и опыта.'});
     if (entity.table === 'RatingMatch') {
       if (Object.prototype.hasOwnProperty.call(body,'completed') || Object.prototype.hasOwnProperty.call(body,'winnerId')) return res.status(400).json({ error: 'Результат рейтингового матча нельзя менять через форму редактирования.' });
       const player1Id = body.player1Id ?? exists.player1Id;

@@ -216,9 +216,8 @@ app.get('/api/currency', (_req,res) => {
       const market = finance.get(player.id);
       return {...player,ratingGames:ratingWins+ratingLosses,matchIncome,tournamentIncome,totalIncome:matchIncome+tournamentIncome,
         marketValueUSD:market?.marketValueUSD??null,forecastUSD:market?.forecastUSD??null,
-        tournamentTitles:titles.map(tournament=>({id:tournament.id,name:tournament.name,type:tournament.type,prizeUSD:currencyTournamentPrize(tournament.type,'player')}))};
+        tournamentTitles:titles.map(tournament=>({id:tournament.id,name:tournament.name,type:currencyEffectiveTournamentType(tournament),prizeUSD:currencyTournamentPrize(currencyEffectiveTournamentType(tournament),'player')}))};
     });
-    const playerById = new Map(playerRows.map(player=>[player.id,player]));
     const teamRows = teams.map(team => {
       const roster = playerRows.filter(player=>player.teamId===team.id);
       const titles = tournaments.filter(tournament=>tournament.winnerId===team.id||(!tournament.winnerId&&tournament.winnerName===team.name));
@@ -231,7 +230,7 @@ app.get('/api/currency', (_req,res) => {
       return {...team,playerCount:roster.length,matchIncome,tournamentIncome,shareIncome,totalIncome:matchIncome+tournamentIncome+shareIncome,
         marketValueUSD:hasAllValues?roster.reduce((sum,player)=>sum+Number(player.marketValueUSD),0):null,
         forecastUSD:hasAllForecasts?roster.reduce((sum,player)=>sum+Number(player.forecastUSD),0):null,
-        tournamentTitles:titles.map(tournament=>({id:tournament.id,name:tournament.name,type:tournament.type,prizeUSD:currencyTournamentPrize(tournament.type,'team')})),
+        tournamentTitles:titles.map(tournament=>({id:tournament.id,name:tournament.name,type:currencyEffectiveTournamentType(tournament),prizeUSD:currencyTournamentPrize(currencyEffectiveTournamentType(tournament),'team')})),
         players:roster.map(player=>({id:player.id,nickname:player.nickname,totalIncome:player.totalIncome,marketValueUSD:player.marketValueUSD,forecastUSD:player.forecastUSD}))};
     });
     const configRows=db.prepare("SELECT id,key,value,description FROM GameConfig WHERE key LIKE 'currency_%' ORDER BY key ASC").all();

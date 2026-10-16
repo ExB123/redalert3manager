@@ -405,6 +405,61 @@ app.get('/api/medals', (_req, res) => {
 app.get('/api/news', (_req, res) => {
   res.json(db.prepare(`SELECT n.id,n.title,n.content,n.createdAt,n.relatedMatchId,n.relatedTournamentId,t.name AS relatedTournamentName,m.map AS relatedMatchMap,m.round AS relatedMatchRound,h.name AS relatedHomeTeam,a.name AS relatedAwayTeam FROM News n LEFT JOIN Tournament t ON t.id=n.relatedTournamentId LEFT JOIN Match m ON m.id=n.relatedMatchId LEFT JOIN Team h ON h.id=m.homeTeamId LEFT JOIN Team a ON a.id=m.awayTeamId ORDER BY n.createdAt DESC`).all());
 });
+app.get('/api/mail', (req,res) => {
+  try {
+    const configured=db.prepare("SELECT value FROM GameConfig WHERE key='main_player_id'").get()?.value;
+    const defaultPlayer=(configured&&db.prepare('SELECT id FROM Player WHERE id=?').get(configured))
+      || db.prepare('SELECT id FROM Player WHERE nickname=? COLLATE NOCASE').get('GGanz');
+    const playerId=String(req.query.playerId||defaultPlayer?.id||'');
+    if(!playerId)return res.json([]);
+    if(!db.prepare('SELECT id FROM Player WHERE id=?').get(playerId))return res.status(400).json({error:'Игрок для почты не найден.'});
+    const rows=db.prepare(`SELECT m.id,m.playerId,m.subject,m.body,m.kind,m.isRead,m.meta,m.createdAt,m.updatedAt,p.nickname AS playerName,t.name AS teamName
+      FROM Mail m JOIN Player p ON p.id=m.playerId LEFT JOIN Team t ON t.id=p.teamId
+      WHERE m.playerId=? ORDER BY m.createdAt DESC,m.id DESC`).all(playerId);
+    res.json(rows.map(row=>{let meta={};try{meta=JSON.parse(row.meta||'{}');}catch{}return {...row,isRead:Boolean(row.isRead),meta:meta&&typeof meta==='object'?meta:{}};}));
+  } catch(error) { res.status(500).json({error:safeErrorMessage(error)}); }
+});
+app.post('/api/mail/:id/read', (req,res) => {
+  try {
+    const row=db.prepare('SELECT id,playerId,isRead FROM Mail WHERE id=?').get(req.params.id);
+    if(!row)return res.status(404).json({error:'Сообщение не найдено.'});
+    const isRead=req.body?.isRead===undefined?true:Boolean(req.body.isRead);
+    const updatedAt=new Date().toISOString();
+    db.prepare('UPDATE Mail SET isRead=?,updatedAt=? WHERE id=?').run(isRead?1:0,updatedAt,row.id);
+    res.json({ok:true,id:row.id,isRead,updatedAt});
+  } catch(error) { res.status(400).json({error:safeErrorMessage(error)}); }
+});
+app.post('/api/mail/:id/respond', (req,res) => {
+  try {
+    const action=req.body?.action;
+    if(!['accept','decline'].includes(action))return res.status(400).json({error:'Выберите действие: accept или decline.'});
+    const result=db.transaction(()=>{
+      const mail=db.prepare('SELECT * FROM Mail WHERE id=?').get(req.params.id);
+      if(!mail)throw new Error('Сообщение не найдено.');
+      if(!['transfer','cooperation'].includes(mail.kind))throw new Error('На это сообщение нельзя ответить действием «Принять/Отклонить».');
+      let meta={};
+      try{meta=JSON.parse(mail.meta||'{}');}catch{throw new Error('Данные предложения повреждены; действие отменено.');}
+      if(meta.response?.status)throw new Error('На это предложение уже ответили.');
+      let acceptedTeam=null;
+      if(action==='accept'&&mail.kind==='transfer'){
+        if(!meta.teamId)throw new Error('В предложении не указана команда.');
+        acceptedTeam=db.prepare('SELECT id,name FROM Team WHERE id=?').get(meta.teamId);
+        if(!acceptedTeam)throw new Error('Команда из предложения больше не существует.');
+        const player=db.prepare('SELECT id FROM Player WHERE id=?').get(mail.playerId);
+        if(!player)throw new Error('Игрок из предложения не найден.');
+        const role=String(meta.role||'Игрок').trim()||'Игрок';
+        const isCaptain=/^(капитан|captain)$/i.test(role)?1:0;
+        db.prepare('UPDATE Player SET teamId=?,position=?,isTeamCaptain=? WHERE id=?').run(acceptedTeam.id,role,isCaptain,player.id);
+      }
+      const now=new Date().toISOString();
+      meta.response={status:action==='accept'?'accepted':'declined',respondedAt:now};
+      if(acceptedTeam){meta.response.teamId=acceptedTeam.id;meta.response.teamName=acceptedTeam.name;}
+      db.prepare('UPDATE Mail SET isRead=1,meta=?,updatedAt=? WHERE id=?').run(JSON.stringify(meta),now,mail.id);
+      return {ok:true,id:mail.id,action,status:meta.response.status,acceptedTeam:acceptedTeam?.name||null,meta};
+    })();
+    res.json(result);
+  } catch(error) { res.status(400).json({error:safeErrorMessage(error)}); }
+});
 app.get('/api/winner-posts', (_req, res) => {
   res.json(db.prepare(`SELECT wp.id,wp.tournamentId,wp.teamId,wp.title,wp.content,wp.createdAt,t.name AS tournamentName,tm.name AS teamName FROM WinnerPost wp LEFT JOIN Tournament t ON t.id=wp.tournamentId LEFT JOIN Team tm ON tm.id=wp.teamId ORDER BY wp.createdAt DESC`).all());
 });

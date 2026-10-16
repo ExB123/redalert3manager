@@ -350,3 +350,8 @@ tbody tr:hover{background:#0a1425}
 .cabinet-history-card .cabinet-match-head{margin-bottom:12px}
 .cabinet-no-opponent{display:flex;flex-direction:column;justify-content:center}
 @media(max-width:900px){.cabinet-match-sections{grid-template-columns:1fr}.cabinet-upcoming-versus{grid-template-columns:minmax(0,1fr)}.cabinet-versus-label{padding:4px}}
+
+.ranked-actions-panel{margin:12px 0 16px;padding:18px;border:1px solid var(--border,#28334a);border-radius:10px;background:rgba(255,255,255,.015)}
+.ranked-actions-panel h3{margin:0 0 12px;font-size:16px}
+.ranked-actions-panel .ranked-actions{margin:0;display:flex;flex-wrap:wrap;gap:8px}
+.ranked-actions-panel .muted{margin:10px 0 0;font-size:12px;line-height:1.5}

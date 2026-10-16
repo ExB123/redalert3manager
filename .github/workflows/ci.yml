@@ -21,5 +21,7 @@ jobs:
         run: npm ci
       - name: Check API syntax
         run: node --check server/index.js
+      - name: Test API and ranked-match mechanics
+        run: npm test
       - name: Build frontend
         run: npm run build

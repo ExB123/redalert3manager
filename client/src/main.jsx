@@ -7,7 +7,7 @@ const nav = [
   ['Валюта', Coins, 'config'], ['Звания', Award, 'ranks'], ['Информация', Info, 'info'], ['Карты', Map, 'maps'],
   ['Матчи', CalendarDays, 'matches'], ['Рейтинг', ChartNoAxesColumn, 'rating'], ['Рейтинговая лига', Layers, 'league'],
   ['Сезоны', CalendarDays, 'seasons'], ['Симулятор', FlaskConical, 'simulator'], ['Список игроков', ContactRound, 'players'],
-  ['Список команд', UsersRound, 'teams'], ['Ставки', Coins, 'bets'], ['Турниры', Swords, 'tournaments'], ['Настройки', Settings, 'settings']
+  ['Список команд', UsersRound, 'teams'], ['Турниры', Swords, 'tournaments'], ['Настройки', Settings, 'settings']
 ];
 const endpoints = {
   teams:'/api/teams', players:'/api/players', tournaments:'/api/tournaments', matches:'/api/matches',
@@ -62,7 +62,7 @@ function App() {
   }
 
   async function load() {
-    if (page === 'home' || page === 'bets' || page === 'settings') { setData([]); setError(''); return; }
+    if (page === 'home' || page === 'settings') { setData([]); setError(''); return; }
     setLoading(true); setError('');
     try {
       const [r, s] = await Promise.all([fetch(endpointFor()), fetch('/api/summary')]);
@@ -166,9 +166,6 @@ function App() {
   else if (page === 'info' && subtab === 'Информация') columns = [['Заголовок','title'],['Текст новости','content'],['Турнир','relatedTournamentName'],['Карта матча','relatedMatchMap'],['Дата','createdAt']];
   else if (page === 'info' && subtab === 'Витрина достижений') columns = [['Изображение',r=><ImageCell src={r.imageUrl} alt={r.name} type="achievement"/>],['Название','name'],['Описание','description'],['Достижения','achievementNames'],['Создана','createdAt']];
 
-  const specialPlaceholder = page === 'bets'
-    ? 'В исходной SQL-базе нет таблицы ставок. Раздел нельзя корректно включить без согласования правил и структуры данных.'
-    : null;
   const crudEntity = entityFor(page, subtab);
   const crudFields = fieldsFor(page, subtab);
 
@@ -223,8 +220,6 @@ function App() {
               loading ? <p className="muted">Загрузка статистики карт…</p> : <MapStatsPanel rows={visibleData} />
             ) : page === 'league' && subtab === 'Статистика фракций' ? (
               loading ? <p className="muted">Загрузка статистики фракций…</p> : <FactionStatsPanel rows={visibleData} />
-            ) : specialPlaceholder ? (
-              <div className="empty-state">{specialPlaceholder}</div>
             ) : loading ? (
               <p className="muted">Загрузка…</p>
             ) : (

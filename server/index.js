@@ -218,7 +218,7 @@ app.get('/api/currency', (_req,res) => {
     const playerRows = players.map(player => {
       const ratingWins = Number(player.ratingWins||0), ratingLosses = Number(player.ratingLosses||0);
       const matchIncome = ratingWins*(playerWinReward+(player.isTeamCaptain?captainBonus:0));
-      const titles = tournaments.filter(tournament => tournament.winnerId===player.teamId || (!tournament.winnerId && tournament.winnerName===player.teamName));
+      const titles = tournaments.filter(tournament => (player.teamId && tournament.winnerId===player.teamId) || (!tournament.winnerId && player.teamName && tournament.winnerName===player.teamName));
       const tournamentIncome = titles.reduce((sum,tournament)=>sum+currencyTournamentPrize(currencyEffectiveTournamentType(tournament),'player'),0);
       const market = finance.get(player.id);
       return {...player,ratingGames:ratingWins+ratingLosses,matchIncome,tournamentIncome,totalIncome:matchIncome+tournamentIncome,

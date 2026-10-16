@@ -23,6 +23,20 @@ db.exec(`CREATE TABLE IF NOT EXISTS TeamFinance (
   forecastUSD INTEGER,
   updatedAt TEXT NOT NULL
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS TeamRanking (
+  teamId TEXT PRIMARY KEY REFERENCES Team(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  mmr INTEGER NOT NULL DEFAULT 0,
+  updatedAt TEXT NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS TournamentPlacementAward (
+  tournamentId TEXT NOT NULL REFERENCES Tournament(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  place INTEGER NOT NULL,
+  teamId TEXT NOT NULL REFERENCES Team(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  ruleKey TEXT NOT NULL,
+  awardedAt TEXT NOT NULL,
+  PRIMARY KEY(tournamentId,place)
+)`);
+db.prepare('INSERT OR IGNORE INTO TeamRanking (teamId,mmr,updatedAt) SELECT id,COALESCE(points,0)*2,? FROM Team').run(new Date().toISOString());
 const defaultCurrencyRules = [
   ['currency_player_win_reward','2000','Доход игрока за победу в рейтинговом матче, USD'],
   ['currency_captain_win_bonus','1000','Доплата капитану за победу в рейтинговом матче, USD'],
@@ -67,6 +81,38 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 const count = (table) => db.prepare(`SELECT COUNT(*) AS n FROM "${table}"`).get().n;
+
+function awardTournamentPlacement(tournamentId, place, teamId, now) {
+  if (!tournamentId || !teamId) return null;
+  const tournament = db.prepare('SELECT id,name,type FROM Tournament WHERE id=?').get(tournamentId);
+  const team = db.prepare('SELECT id,name FROM Team WHERE id=?').get(teamId);
+  if (!tournament || !team) return null;
+  const effectiveType = currencyEffectiveTournamentType(tournament);
+  const rulePrefix = String(effectiveType).toLowerCase().includes('ffa') ? 'ffa_grand_league' : currencyTypeSlug(effectiveType);
+  const ruleKey = rulePrefix + '_' + place + '_place';
+  const configRow = db.prepare('SELECT value FROM GameConfig WHERE key=?').get(ruleKey);
+  if (!configRow) return null;
+  let rule;
+  try { rule = JSON.parse(configRow.value); }
+  catch { throw new Error('Правило ' + ruleKey + ' содержит некорректный JSON.'); }
+  const teamPoints = Number(rule.teamPoints ?? 0);
+  const teamMMR = Number(rule.teamMMR ?? 0);
+  const playerPoints = Number(rule.playerPoints ?? 0);
+  const playerMMR = Number(rule.playerMMR ?? 0);
+  if (![teamPoints,teamMMR,playerPoints,playerMMR].every(value=>Number.isFinite(value)&&value>=0)) {
+    throw new Error('Правило ' + ruleKey + ' содержит некорректные начисления.');
+  }
+  const inserted = db.prepare('INSERT OR IGNORE INTO TournamentPlacementAward (tournamentId,place,teamId,ruleKey,awardedAt) VALUES (?,?,?,?,?)')
+    .run(tournamentId,place,teamId,ruleKey,now);
+  if (!inserted.changes) return null;
+  db.prepare('INSERT OR IGNORE INTO TeamRanking (teamId,mmr,updatedAt) SELECT id,COALESCE(points,0)*2,? FROM Team WHERE id=?').run(now,teamId);
+  db.prepare('UPDATE Team SET points=COALESCE(points,0)+?,updatedAt=? WHERE id=?').run(teamPoints,now,teamId);
+  db.prepare('UPDATE TeamRanking SET mmr=mmr+?,updatedAt=? WHERE teamId=?').run(teamMMR,now,teamId);
+  const players = db.prepare('SELECT id FROM Player WHERE teamId=?').all(teamId);
+  const updatePlayer = db.prepare('UPDATE Player SET rpPoints=COALESCE(rpPoints,0)+?,ratingPoints=COALESCE(ratingPoints,0)+?,rpPeak=MAX(COALESCE(rpPeak,0),COALESCE(rpPoints,0)+?) WHERE id=?');
+  for (const player of players) updatePlayer.run(playerPoints,playerMMR,playerPoints,player.id);
+  return {place,teamId,teamName:team.name,ruleKey,teamPoints,teamMMR,playerPoints,playerMMR,playersAwarded:players.length};
+}
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, name: 'Red Alert Tournament Manager API', database: path.basename(dbPath) }));
 app.get('/api/summary', (_req, res) => res.json({

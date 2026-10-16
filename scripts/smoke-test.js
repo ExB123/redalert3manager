@@ -14,7 +14,8 @@ db.exec("CREATE TABLE Team(id TEXT PRIMARY KEY,name TEXT NOT NULL,logoUrl TEXT,w
 "CREATE TABLE Rank(id TEXT PRIMARY KEY,name TEXT,imageUrl TEXT);"+
 "CREATE TABLE MapStat(id TEXT PRIMARY KEY,mapName TEXT,mapId TEXT,wins INTEGER DEFAULT 0,losses INTEGER DEFAULT 0,teamId TEXT,playerId TEXT,createdAt TEXT);"+
 "CREATE TABLE RatingMatch(id TEXT PRIMARY KEY,player1Id TEXT NOT NULL,player2Id TEXT NOT NULL,scheduledAt TEXT NOT NULL,completed INTEGER DEFAULT 0,winnerId TEXT,createdAt TEXT,updatedAt TEXT,map TEXT);"+
-"CREATE TABLE Simulation(id TEXT PRIMARY KEY,createdAt TEXT,input TEXT NOT NULL,result TEXT NOT NULL);");
+"CREATE TABLE Simulation(id TEXT PRIMARY KEY,createdAt TEXT,input TEXT NOT NULL,result TEXT NOT NULL);"+
+"CREATE TABLE Mail(id TEXT PRIMARY KEY,playerId TEXT NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'general',isRead INTEGER NOT NULL DEFAULT 0,meta TEXT,createdAt TEXT NOT NULL,updatedAt TEXT NOT NULL);");
 const team=db.prepare('INSERT INTO Team(id,name,wins,losses,points,level,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?,?)');
 team.run('ds','DS Esports',22,4,170,2,now,now);team.run('as','Astralis',21,5,162,2,now,now);team.run('other','Other Team',10,5,50,1,now,now);team.run('fnatic','Fnatic',13,6,105,2,now,now);
 const player=db.prepare('INSERT INTO Player(id,nickname,faction,teamId,isTeamCaptain,ratingGames,ratingWins,ratingLosses,ratingPoints,rpPoints,rpPeak,experience) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
@@ -47,6 +48,9 @@ const addMapStat=db.prepare('INSERT INTO MapStat(id,mapName,mapId,wins,losses,te
 addMapStat.run('ms-gg','Обычное столкновение','m1',5,2,null,'gg',now);
 addMapStat.run('ms-mo','Обычное столкновение','m1',4,3,null,'mo',now);
 addMapStat.run('ms-ma','Промышленная мощь','m2',1,6,null,'ma',now);
+const addMail=db.prepare('INSERT INTO Mail(id,playerId,subject,body,kind,isRead,meta,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?,?,?)');
+addMail.run('mail-transfer','gg','Трансферное предложение от Astralis','Предлагается перейти в Astralis.','transfer',0,JSON.stringify({type:'transfer',teamId:'as',teamName:'Astralis',role:'Капитан',contractYears:2,transferFeeUSD:900000,annualSalaryUSD:300000,signingBonusUSD:50000}),now,now);
+addMail.run('mail-coop','gg','Партнёрство с HyperX','Предложение о сотрудничестве.','cooperation',0,JSON.stringify({type:'cooperation',company:'HyperX',amountUSD:15000,durationMonths:6,perks:['стримы','мерч']}),now,now);
 const addCompletedMatch=db.prepare('INSERT INTO RatingMatch(id,player1Id,player2Id,scheduledAt,completed,winnerId,createdAt,updatedAt,map) VALUES(?,?,?,?,1,?,?,?,?)');
 addCompletedMatch.run('faction-match-1','gg','mat',now,'gg',now,now,'Обычное столкновение');
 addCompletedMatch.run('faction-match-2','mo','ma',now,'ma',now,now,'Обычное столкновение');
@@ -110,6 +114,12 @@ const finalTournament=verifyTournament.prepare("SELECT winnerId,winnerName FROM 
 assert.equal(finalTournament.winnerId,'ds');assert.equal(finalTournament.winnerName,'DS Esports');
 assert.equal(verifyTournament.prepare("SELECT completed FROM Match WHERE id='final-test'").get().completed,1);
 verifyTournament.close();
+const inbox=await req('/api/mail');assert.equal(inbox.length,2);assert.ok(inbox.some(item=>item.id==='mail-transfer'&&!item.isRead));
+const readMail=await req('/api/mail/mail-transfer/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({isRead:true})});assert.equal(readMail.isRead,true);
+const acceptedOffer=await req('/api/mail/mail-transfer/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'accept'})});assert.equal(acceptedOffer.acceptedTeam,'Astralis');
+const transferredPlayer=(await req('/api/players')).find(player=>player.nickname==='GGanz');assert.equal(transferredPlayer.teamId,'as');assert.equal(transferredPlayer.position,'Капитан');
+const duplicateResponse=await fetch(url+'/api/mail/mail-transfer/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'decline'})});assert.equal(duplicateResponse.status,400);
+const respondedInbox=await req('/api/mail');assert.equal(respondedInbox.find(item=>item.id==='mail-transfer').meta.response.status,'accepted');
 const backup=await req('/api/backups',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
 assert.ok(backup.ok&&backup.id&&backup.tableCount>0);
 const backupList=await req('/api/backups');assert.ok(backupList.some(item=>item.id===backup.id&&item.restorable));
@@ -119,6 +129,6 @@ const restored=await req('/api/backups/'+backup.id+'/restore',{method:'POST',hea
 assert.equal(restored.ok,true);
 assert.ok((await req('/api/teams')).some(team=>team.name==='DS Esports'));
 assert.ok(!(await req('/api/teams')).some(team=>team.name==='Temporary Backup Test Team'));
-console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, saved main-player settings, protected completed-match history, full database backup and restore, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
+console.log('Smoke tests passed: PDF currency calculations, saved valuations, rule editing, map/faction statistics, map updates after ranked matches, saved main-player settings, mail reading and transfer acceptance, protected completed-match history, full database backup and restore, unique 20-match scheduling, GGanz exclusion, matchmaking, and tournament-final winner recording.');
 }finally{await stop();for(const f of ['test.sqlite','test.sqlite-shm','test.sqlite-wal'])try{fs.rmSync(path.join(dir,f),{force:true});}catch{}try{fs.rmSync(dir,{recursive:true,force:true});}catch{}}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});

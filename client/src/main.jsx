@@ -733,7 +733,8 @@ function RatingMatchesTable({rows,onComplete}) {
       const result = await response.json();
       if(!response.ok) throw new Error(result.error || 'Не удалось завершить рейтинговый матч.');
       await onComplete?.();
-    } catch(e) { setError(e.message); }
+      return true;
+    } catch(e) { setError(e.message); return false; }
     finally { setBusyId(''); }
   }
   const upcoming = rows.filter(match=>!match.completed).sort((a,b)=>String(a.scheduledAt||'').localeCompare(String(b.scheduledAt||'')));
@@ -777,7 +778,7 @@ function RatingMatchesTable({rows,onComplete}) {
         <div><span className={'player-faction-dot '+factionDotClass(details.player2Faction)}>●</span><h3>{details.player2||'Неизвестен'}</h3><p>{details.player2Team||'Без команды'}</p><span>RP: {details.player2RP??0} · MMR: {details.player2MMR??0}</span><p><FactionName value={details.player2Faction}/></p></div>
       </div>
       <div className="currency-detail-grid"><div><span>Дата и время</span><strong>{formatDate(details.scheduledAt)}</strong></div><div><span>Карта</span><strong>{details.map||'—'}</strong></div><div><span>Статус</span><strong>{details.completed?'Завершён':'Ожидается'}</strong></div><div><span>Победитель</span><strong>{details.winner||'Не определён'}</strong></div></div>
-      {!details.completed&&<div className="modal-actions"><button className="primary" onClick={async()=>{await complete(details,details.player1Id);setDetails(null);}}>Победа {details.player1}</button><button className="primary" onClick={async()=>{await complete(details,details.player2Id);setDetails(null);}}>Победа {details.player2}</button></div>}
+      {!details.completed&&<div className="modal-actions"><button className="primary" onClick={async()=>{if(await complete(details,details.player1Id))setDetails(null);}}>Победа {details.player1}</button><button className="primary" onClick={async()=>{if(await complete(details,details.player2Id))setDetails(null);}}>Победа {details.player2}</button></div>}
     </section></div>}
   </div>;
 }

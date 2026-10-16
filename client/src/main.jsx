@@ -802,12 +802,6 @@ function FactionStatsPanel({rows}) {
       .catch(()=>{if(active)setRatingMatches([]);});
     return ()=>{active=false;};
   },[]);
-  const totalWins=rows.reduce((sum,row)=>sum+Number(row.wins||0),0);
-  const totalLosses=rows.reduce((sum,row)=>sum+Number(row.losses||0),0);
-  const factions=rows.map(row=>{
-    const wins=Number(row.wins||0),losses=Number(row.losses||0),games=wins+losses;
-    return {...row,games,winRate:games?Math.round(wins/games*100):0,share:totalWins?Math.round(wins/totalWins*100):0};
-  }).sort((a,b)=>b.wins-a.wins);
   const normalizeFaction = value => {
     const v=String(value||'').trim().toLowerCase();
     if(v.includes('альянс')||v.includes('allied')||v.includes('allies'))return 'Альянс';
@@ -815,7 +809,14 @@ function FactionStatsPanel({rows}) {
     if(v.includes('импер')||v.includes('empire'))return 'Империя';
     return '';
   };
+  const displayOrder = {'Союз':0,'Альянс':1,'Империя':2};
   const factionOrder = {'Альянс':0,'Империя':1,'Союз':2};
+  const totalWins=rows.reduce((sum,row)=>sum+Number(row.wins||0),0);
+  const totalLosses=rows.reduce((sum,row)=>sum+Number(row.losses||0),0);
+  const factions=rows.map(row=>{
+    const wins=Number(row.wins||0),losses=Number(row.losses||0),games=wins+losses;
+    return {...row,faction:normalizeFaction(row.faction)||row.faction,games,winRate:games?Math.round(wins/games*100):0};
+  }).sort((a,b)=>(displayOrder[a.faction]??99)-(displayOrder[b.faction]??99));
   const playerById = new Map(players.map(player=>[player.id,player]));
   const matchupMap = new Map();
   ratingMatches.filter(match=>Boolean(match.completed)&&match.winnerId).forEach(match=>{
@@ -834,24 +835,27 @@ function FactionStatsPanel({rows}) {
   const matchups=[...matchupMap.values()].filter(item=>item.matches>0).sort((a,b)=>factionOrder[a.first]-factionOrder[b.first]||factionOrder[a.second]-factionOrder[b.second]);
   if(!rows.length) return <div className="empty-state">Статистика фракций пока отсутствует в базе.</div>;
   return <div className="faction-dashboard">
-    <div className="faction-overview-grid">
-      <div className="map-stat-card"><span>Всего матчей по статистике</span><strong>{totalWins}</strong></div>
-      <div className="map-stat-card"><span>Побед по фракциям</span><div className="faction-summary-lines">{factions.map(row=><div key={row.faction}><FactionName value={row.faction}/><strong>{row.wins||0}</strong></div>)}</div></div>
-      <div className="map-stat-card"><span>Поражений по фракциям</span><div className="faction-summary-lines">{factions.map(row=><div key={row.faction}><FactionName value={row.faction}/><strong>{row.losses||0}</strong></div>)}</div></div>
-    </div>
-    <div className="faction-comparison">{factions.map((faction,index)=>{
-      const top=players.filter(player=>player.faction===faction.faction).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,3);
-      return <section className="faction-card" key={faction.faction}><div className="faction-card-head"><div><span className="faction-index">0{index+1}</span><h3><FactionName value={faction.faction}/></h3></div><strong>{faction.winRate}% <small>побед</small></strong></div>
+    <section className="faction-overview-section">
+      <h3>Общая статистика</h3>
+      <div className="faction-overview-grid">
+        <div className="map-stat-card"><span>Всего матчей</span><strong>{totalWins}</strong></div>
+        <div className="map-stat-card"><span>Побед по фракциям</span><div className="faction-summary-lines">{factions.map(row=><div key={row.faction}><FactionName value={row.faction}/><strong>{row.wins}</strong></div>)}</div></div>
+        <div className="map-stat-card"><span>Поражений по фракциям</span><div className="faction-summary-lines">{factions.map(row=><div key={row.faction}><FactionName value={row.faction}/><strong>{row.losses}</strong></div>)}</div></div>
+      </div>
+    </section>
+    <section className="faction-winrate-section">
+      <h3>Победы / Поражения по фракциям</h3>
+      <div className="faction-winrate-grid">{factions.map(faction=><article className="faction-winrate-card" key={faction.faction}>
+        <strong><FactionName value={faction.faction}/></strong>
+        <span className="faction-winrate-label">Винрейт: {faction.winRate}%</span>
         <div className="faction-meter"><span style={{width:faction.winRate+'%'}}/></div>
-        <div className="faction-metrics"><div><span>Победы</span><strong>{faction.wins||0}</strong></div><div><span>Поражения</span><strong>{faction.losses||0}</strong></div><div><span>Доля побед</span><strong>{faction.share}%</strong></div><div><span>Средний RP</span><strong>{faction.averageRP??0}</strong></div></div>
-        <h4>Лучшие игроки по RP</h4>
-        {top.length ? top.map((player,i)=><div className="faction-player" key={player.id}><span>{i+1}</span><strong>{player.nickname}</strong><small>{player.rpPoints??0} RP</small></div>) : <p className="muted">Игроки этой фракции не найдены.</p>}
-      </section>;
-    })}</div>
+        <div className="faction-winrate-values"><span>Победы: {faction.wins}</span><span>Поражения: {faction.losses}</span></div>
+      </article>)}</div>
+    </section>
     <section className="faction-detail-table panel">
       <h3>Лучшие игроки фракций</h3>
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Фракция</th><th>Игрок</th><th>Команда</th><th>RP</th><th>Звание</th></tr></thead><tbody>
-        {factions.map(faction=>players.filter(player=>String(player.faction||'').toLowerCase()===String(faction.faction||'').toLowerCase()).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,1).map(player=><tr key={faction.faction}><td><FactionName value={faction.faction}/></td><td>{player.nickname}</td><td>{player.teamName||'—'}</td><td>{player.rpPoints??0}</td><td>{player.rankName||'—'}</td></tr>))}
+        {factions.map(faction=>players.filter(player=>normalizeFaction(player.faction)===faction.faction).sort((a,b)=>Number(b.rpPoints||0)-Number(a.rpPoints||0)).slice(0,1).map(player=><tr key={faction.faction}><td><FactionName value={faction.faction}/></td><td><span className="player-ranking-name"><span className={'player-faction-dot '+(faction.faction==='Союз'?'faction-red':faction.faction==='Альянс'?'faction-blue':'faction-yellow')}>●</span>{player.nickname}</span></td><td>{player.teamName||'—'}</td><td>{player.rpPoints??0}</td><td>{player.rankName||'—'}</td></tr>)}
       </tbody></table></div>
     </section>
     <section className="faction-detail-table panel">
@@ -859,7 +863,6 @@ function FactionStatsPanel({rows}) {
       <p className="muted">Результаты рассчитаны по завершённым рейтинговым матчам и текущим фракциям игроков. Если игрок менял фракцию, историческая принадлежность может отличаться.</p>
       {matchups.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Пара фракций</th><th>Матчи</th><th>Победы первой</th><th>Победы второй</th><th>Винрейт (первая/вторая)</th></tr></thead><tbody>{matchups.map(item=>{const decided=item.firstWins+item.secondWins;return <tr key={item.first+'|'+item.second}><td><FactionName value={item.first}/> vs <FactionName value={item.second}/></td><td>{item.matches}</td><td>{item.firstWins}</td><td>{item.secondWins}</td><td>{decided?Math.round(item.firstWins/decided*100):0}% / {decided?Math.round(item.secondWins/decided*100):0}%</td></tr>;})}</tbody></table></div> : <p className="muted">Нет завершённых рейтинговых матчей с известными фракциями обоих участников.</p>}
     </section>
-    <p className="muted">Суммарные показатели взяты из статистики игроков; очные встречи рассчитаны из сохранённых результатов матчей.</p>
   </div>;
 }
 

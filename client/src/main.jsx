@@ -79,8 +79,8 @@ function App() {
 
   async function runRankedAction(action) {
     if (rankedBusy) return;
-    if (action === 'simulate-20' && !window.confirm('Провести 20 новых рейтинговых матчей? Будут выбраны игроки, определены победители и обновлены RP/MMR/статистика.')) return;
-    if (action === 'simulate-upcoming' && !window.confirm('Симулировать до 20 ближайших незавершённых рейтинговых матчей? Результаты и рейтинги игроков будут сохранены.')) return;
+    if (action === 'simulate-20' && !window.confirm('Создать 20 новых пар рейтинговых матчей без участия основного игрока? Результаты и рейтинги не изменятся, пока вы не запустите «Симулировать ближайшие матчи».')) return;
+    if (action === 'simulate-upcoming' && !window.confirm('Симулировать до 20 ближайших незавершённых рейтинговых матчей без участия основного игрока? Результаты и рейтинги будут сохранены.')) return;
     setRankedBusy(true);
     setError('');
     setActionMessage('');
@@ -94,8 +94,10 @@ function App() {
       if (!response.ok) throw new Error(result.error || 'Не удалось выполнить действие.');
       if (action === 'find-opponent') {
         setActionMessage(result.message + ' ' + result.match.player1 + ' vs ' + result.match.player2 + (result.match.map ? ' · Карта: ' + result.match.map : '') + '.');
+      } else if (action === 'simulate-20') {
+        setActionMessage(result.message || ('Создано предстоящих матчей: ' + result.count + '.'));
       } else {
-        setActionMessage((result.message || 'Операция завершена.') + ' Обработано матчей: ' + result.count + '.');
+        setActionMessage((result.message || 'Операция завершена.') + ' Проведено матчей: ' + result.count + '.');
       }
       await load();
     } catch (e) {
